@@ -251,23 +251,16 @@ function regenerate(): void {
 }
 
 function renderRooms(interior: InteriorSpec): void {
-  const list = $('features');
-  const items: HTMLElement[] = [];
-  const head = (t: string) => Object.assign(document.createElement('h3'), { textContent: t });
-  const li = (t: string) => Object.assign(document.createElement('li'), { textContent: t });
-  for (const L of [...interior.levels].reverse()) {
-  const rooms = interior.rooms.filter((r) => r.level === L.index);
-  items.push(head(`${L.name} · ${rooms.length} rooms · ${rooms.reduce((a, r) => a + r.area, 0).toFixed(0)} m²`));
-  const groups = new Map<string, typeof rooms>();
-  for (const r of rooms) groups.set(r.unit ?? '', [...(groups.get(r.unit ?? '') ?? []), r]);
-  for (const [unit, rs] of groups) {
-    const u = interior.units.find((x) => x.id === unit && x.level === L.index);
-    if (u) items.push(head(`${u.name} · ${u.area} m²`));
-    else if (groups.size > 1) items.push(head('Common'));
-    for (const r of rs) items.push(li(`${r.name} — ${r.area.toFixed(1)} m²`));
-  }
-  }
-  list.replaceChildren(...items);
+  // One line per level (top first): rooms, area, flats — not every room.
+  const items = [...interior.levels].reverse().map((L) => {
+    const rooms = interior.rooms.filter((r) => r.level === L.index);
+    const flats = interior.units.filter((u) => u.level === L.index).length;
+    const area = rooms.reduce((a, r) => a + r.area, 0);
+    return Object.assign(document.createElement('li'), {
+      textContent: `${L.name} — ${rooms.length} rooms, ${area.toFixed(0)} m²${flats ? `, ${flats} flat${flats > 1 ? 's' : ''}` : ''}`,
+    });
+  });
+  $('features').replaceChildren(...items);
 }
 
 viewer.setTime(state.time);

@@ -850,8 +850,18 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
 
   // Towers: lift the belvedere stages so their windows clear the main roof (mansards rise steeply).
   for (const tw of towers) {
-    const roofAtTower = Math.max(...tw.outline.map(([x, z]) => (x >= main.x0 && x <= main.x1 && z >= main.z0 && z <= main.z1 ? roofHeightAt(main, x, z) : 0)));
-    const shift = Math.max(0, roofAtTower + 0.15 - (tw.stageBase + 0.85));
+    // Lift only as much as the roof actually rises in front of a belvedere window.
+    let need = 0;
+    for (const fc of tw.facades) {
+      for (const o of fc.openings) {
+        if (o.floor < nFloors) continue;
+        const px = o.position[0] + fc.normal[0] * 0.6;
+        const pz = o.position[2] + fc.normal[1] * 0.6;
+        if (px < main.x0 || px > main.x1 || pz < main.z0 || pz > main.z1) continue;
+        need = Math.max(need, roofHeightAt(main, px, pz) + 0.15 - o.sill);
+      }
+    }
+    const shift = Math.max(0, need);
     if (shift <= 0) continue;
     tw.stageBase = r3(tw.stageBase + shift);
     tw.wallTop = r3(tw.wallTop + shift);
