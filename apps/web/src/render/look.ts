@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 /**
@@ -316,12 +317,23 @@ export function stainMaterial(color: string): THREE.MeshStandardMaterial {
 export const lookGlobals = { night: { value: 0 }, lit: { value: 0.45 } };
 
 /**
+ * Glass gets its own studio-style reflection map (bright light panels) so panes
+ * show crisp highlights; the soft sky alone makes reflections look flat.
+ */
+let studioEnv: THREE.Texture | null = null;
+export function glassReflections(renderer: THREE.WebGLRenderer, glass: THREE.MeshStandardMaterial): void {
+  studioEnv ??= new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.02).texture;
+  glass.envMap = studioEnv;
+  glass.needsUpdate = true;
+}
+
+/**
  * Window glass: dielectric with Fresnel reflections of the sky; each pane (aWin)
  * gets its own interior darkness and sometimes a curtain; at dusk/night a share
  * of the windows glows warm through the curtains.
  */
 export function glassMaterial(): THREE.MeshStandardMaterial {
-  const mat = new THREE.MeshStandardMaterial({ color: '#1d2a33', roughness: 0.03, metalness: 0.05, envMapIntensity: 1.8 });
+  const mat = new THREE.MeshStandardMaterial({ color: '#1d2a33', roughness: 0.05, metalness: 0.15, envMapIntensity: 0.6 });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uNight = lookGlobals.night;
     shader.uniforms.uLit = lookGlobals.lit;

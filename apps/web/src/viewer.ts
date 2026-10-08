@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { createLook, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from './render/look';
+import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from './render/look';
 import type { InteriorSpec } from '@citygen/interior';
 import type { MeshData } from '@citygen/core';
 import type { HouseSpec, WorldEdge } from '@citygen/house';
@@ -55,6 +55,7 @@ export class HouseViewer {
     container.appendChild(this.renderer.domElement);
 
     this.look = createLook(this.renderer, this.scene, this.camera, { aoRadius: 0.9, haze: 0.0016, skyRadius: 1500 });
+    glassReflections(this.renderer, this.glass);
     this.look.setSun(new THREE.Vector3(-1.3, 1.25, 1.1));
 
     this.hemi = new THREE.HemisphereLight('#e4e8ed', '#8d8573', 0.45);

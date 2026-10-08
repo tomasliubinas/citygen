@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
-import { createLook, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from '../render/look';
+import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from '../render/look';
 import type { CitySpec, PlotSpec } from '@citygen/city';
 import { buildHouseMesh, generateHouse, type HouseSpec } from '@citygen/house';
 import { buildMassing } from './massing';
@@ -76,6 +76,7 @@ export class CityView {
     container.prepend(this.renderer.domElement);
 
     this.look = createLook(this.renderer, this.scene, this.camera, { aoRadius: 1.6, haze: 0.0011, skyRadius: 4000 });
+    glassReflections(this.renderer, this.glass);
     this.look.setSun(new THREE.Vector3(-160, 260, 140));
     this.hemi = new THREE.HemisphereLight('#e4e8ed', '#8d8573', 0.55);
     this.scene.add(this.hemi);
