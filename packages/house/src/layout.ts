@@ -469,7 +469,8 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       case 'main':
         return plain({
           sill: e + 0.8,
-          height: Math.min(winW * g.windowRatio * 1.1, H - 0.8 - 1.0),
+          // Piano nobile: the tallest windows. Deco frames have no crowns, so they may rise higher.
+          height: g.glazing === 'deco' ? Math.min(winW * Math.max(g.windowRatio * 1.35, 1.75), H - 0.8 - 0.5) : Math.min(winW * g.windowRatio * 1.1, H - 0.8 - 1.0),
           head: g.windowHead,
           crown: primary ? crownPattern(d) : 'cornice',
           apron: primary,
