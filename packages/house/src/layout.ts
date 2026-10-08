@@ -1046,8 +1046,8 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       stain: '#463e33',
       accent: g.colors.accent,
     },
-    // Old towns are older: the centre leans towards worn houses.
-    weathering: { condition: r3(clamp(g.age * 0.75 + input.centrality * 0.25, 0, 1)) },
+    // Central façades are the kept-up, restored ones; wear builds up towards the outskirts.
+    weathering: { condition: r3(clamp(g.age * (1 - 0.65 * input.centrality), 0, 1)) },
     wallThickness: WALL_THICKNESS,
     plinthHeight: r3(plinth),
     floors,
