@@ -57,7 +57,12 @@ export class CityView {
   private massingMat = enhanceMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 'plaster', true);
   private massingRoofMat = enhanceMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0.1, side: THREE.DoubleSide }), 'roof', true);
   private look!: Look;
-  private stain: THREE.MeshStandardMaterial | null = null;
+  private decals = new Map<string, THREE.MeshStandardMaterial>();
+  private decal(slot: string, color: string): THREE.MeshStandardMaterial {
+    let m = this.decals.get(slot);
+    if (!m) this.decals.set(slot, (m = stainMaterial(color)));
+    return m;
+  }
   private glass = glassMaterial();
   private hemi!: THREE.HemisphereLight;
   private sunElevation = 1;
@@ -401,7 +406,7 @@ export class CityView {
       g.userData.full = full;
       g.traverse((o) => {
         if (!(o instanceof THREE.Mesh) || !o.userData.slot) return;
-        if (o.userData.slot === 'stain') o.visible = full;
+        if (o.userData.slot === 'stain' || o.userData.slot === 'rust') o.visible = full;
         else if (o.userData.slot === 'glass') return;
         else o.material = this.material(o.userData.slot, o.userData.color, full ? o.userData.age : null);
       });
@@ -441,11 +446,11 @@ export class CityView {
     for (const [slot, buf] of Object.entries(mesh)) {
       const geo = geometryFor(buf, slot);
       const color = spec.palette[slot] ?? '#cccccc';
-      const mat = slot === 'stain' ? (this.stain ??= stainMaterial(spec.palette.stain ?? '#463e33')) : slot === 'glass' ? this.glass : this.material(slot, color);
+      const mat = slot === 'stain' || slot === 'rust' ? this.decal(slot, spec.palette[slot] ?? '#463e33') : slot === 'glass' ? this.glass : this.material(slot, color);
       const m = new THREE.Mesh(geo, mat);
       m.userData = { slot, color, age };
-      if (slot === 'stain') m.visible = false;
-      m.castShadow = slot !== 'glass' && slot !== 'stain';
+      if (slot === 'stain' || slot === 'rust') m.visible = false;
+      m.castShadow = slot !== 'glass' && slot !== 'stain' && slot !== 'rust';
       m.receiveShadow = true;
       g.add(m);
     }

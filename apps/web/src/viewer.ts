@@ -37,7 +37,12 @@ export class HouseViewer {
   private ground: THREE.Mesh;
   private look: Look;
   private sunKey = '';
-  private stain: THREE.MeshStandardMaterial | null = null;
+  private decals = new Map<string, THREE.MeshStandardMaterial>();
+  private decal(slot: string, color: string): THREE.MeshStandardMaterial {
+    let m = this.decals.get(slot);
+    if (!m) this.decals.set(slot, (m = stainMaterial(color)));
+    return m;
+  }
   private glass = (() => { const g = glassMaterial(); g.name = 'glass'; return g; })();
   private hemi!: THREE.HemisphereLight;
   private sunElevation = 1;
@@ -117,9 +122,9 @@ export class HouseViewer {
     disposeChildren(this.house);
     for (const [slot, buf] of Object.entries(mesh)) {
       const g = geometryFor(buf, slot);
-      const mat = slot === 'stain' ? (this.stain ??= stainMaterial(spec.palette.stain ?? '#463e33')) : slot === 'glass' ? this.glass : this.material(slot, spec.palette[slot] ?? '#cccccc');
+      const mat = slot === 'stain' || slot === 'rust' ? this.decal(slot, spec.palette[slot] ?? '#463e33') : slot === 'glass' ? this.glass : this.material(slot, spec.palette[slot] ?? '#cccccc');
       const m = new THREE.Mesh(g, mat);
-      m.castShadow = slot !== 'glass' && slot !== 'stain';
+      m.castShadow = slot !== 'glass' && slot !== 'stain' && slot !== 'rust';
       m.receiveShadow = true;
       this.house.add(m);
     }

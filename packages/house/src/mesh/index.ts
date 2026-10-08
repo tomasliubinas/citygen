@@ -7,7 +7,7 @@ import { buildBalcony, buildPortico, buildStair } from './structures';
 import { buildWeathering } from './weathering';
 
 /** Material slots used by the house mesh; colours come from `spec.palette`. */
-export const HOUSE_MATERIALS = ['wall', 'trim', 'stone', 'roof', 'glass', 'frame', 'door', 'metal', 'roofTrim', 'accent', 'stain'] as const;
+export const HOUSE_MATERIALS = ['wall', 'trim', 'stone', 'roof', 'glass', 'frame', 'door', 'metal', 'roofTrim', 'accent', 'stain', 'rust'] as const;
 export type HouseMaterial = (typeof HOUSE_MATERIALS)[number];
 
 /** HouseSpec → renderer-agnostic triangle buffers (building-local coordinates). */

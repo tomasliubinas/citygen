@@ -1044,6 +1044,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       metal: '#1f2124',
       roofTrim: '#61666d',
       stain: '#463e33',
+      rust: '#7a4528',
       accent: g.colors.accent,
     },
     // Central façades are the kept-up, restored ones; wear builds up towards the outskirts.

@@ -79,6 +79,22 @@ const SURFACE = /* glsl */ `
 #ifndef LOOK_LITE
       c *= 0.955 + 0.09 * lookFbm(wp * 0.33);
       c = mix(c, c * vec3(0.975, 0.955, 0.9), uLookAge * 0.7);
+      float wear = smoothstep(0.1, 0.85, uLookAge);
+      // Faded paint: colour drains towards a warm grey.
+      float lum = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(c, vec3(lum) * vec3(1.0, 0.985, 0.95), 0.4 * wear);
+      // Blotchy repaints: patches a shade lighter or darker.
+      float blot = lookFbm(wp * 0.16 + 11.0);
+      c *= 1.0 + wear * (smoothstep(0.58, 0.66, blot) * 0.06 - smoothstep(0.34, 0.26, blot) * 0.05);
+      // Rising damp: a darker, uneven band above the ground.
+      float damp = (1.0 - smoothstep(0.5, 1.2 + 0.5 * lookNoise(wp * 0.6), h)) * wear;
+      c *= 1.0 - 0.2 * damp;
+      // Peeling plaster: a few patches of bare grey render, mostly low on the wall.
+      if (uLookKind == 1) {
+        float pn = lookFbm(wp * 0.85 + 3.1) + 0.06 * (1.0 - smoothstep(0.8, 3.0, h));
+        float peel = smoothstep(0.735, 0.745, pn - 0.09 * wear + 0.09) * step(0.3, wear);
+        c = mix(c, vec3(0.6, 0.57, 0.53) * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * 0.85);
+      }
 #endif
     }
     if (brick > 0.5) c *= 1.0 - 0.08 * uLookAge;
@@ -102,8 +118,11 @@ const SURFACE = /* glsl */ `
     c *= mix(1.0, 0.8 + 0.2 * smoothstep(0.0, 0.3, fract(v)), fade);
     c *= 1.0 - 0.18 * lookLine(u, 0.02) * fade;
 #ifndef LOOK_LITE
-    float lichen = smoothstep(0.62 - 0.18 * uLookAge, 0.85, lookFbm(wp * 0.25));
-    c = mix(c, c * vec3(1.06, 1.1, 0.93), lichen * (0.2 + 0.6 * uLookAge));
+    float lichen = smoothstep(0.62 - 0.22 * uLookAge, 0.85, lookFbm(wp * 0.25));
+    c = mix(c, c * vec3(1.05, 1.14, 0.88), lichen * (0.2 + 0.8 * uLookAge));
+    // Patchy repairs: a few replaced tiles in a fresher tone.
+    float rep = step(1.0 - 0.07 * smoothstep(0.1, 0.85, uLookAge), lookHash2(vec2(floor(u) + 17.0, row)));
+    c = mix(c, c * vec3(1.14, 1.06, 0.96), rep * fade);
 #endif
   } else if (uLookKind == 5) {
 #ifndef LOOK_LITE
@@ -299,7 +318,7 @@ export function geometryFor(buf: { positions: Float32Array; normals: Float32Arra
   g.setIndex(new THREE.BufferAttribute(buf.indices, 1));
   if (slot === 'glass') {
     g.setAttribute('aWin', new THREE.BufferAttribute(buf.alpha ?? new Float32Array(buf.positions.length / 3).fill(0.5), 1));
-  } else if (buf.alpha && slot === 'stain') {
+  } else if (buf.alpha && (slot === 'stain' || slot === 'rust')) {
     const col = new Float32Array((buf.alpha.length) * 4);
     for (let i = 0; i < buf.alpha.length; i++) col.set([1, 1, 1, buf.alpha[i]], i * 4);
     g.setAttribute('color', new THREE.BufferAttribute(col, 4));
