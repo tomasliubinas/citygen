@@ -338,10 +338,10 @@ export function glassMaterial(): THREE.MeshStandardMaterial {
     shader.uniforms.uNight = lookGlobals.night;
     shader.uniforms.uLit = lookGlobals.lit;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float aWin;\nvarying float vWin;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWin = aWin;');
+      .replace('#include <common>', '#include <common>\nattribute float aWin;\nvarying float vWin;\nvarying vec3 vGlassPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWin = aWin;\nvGlassPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vWin;\nuniform float uNight;\nuniform float uLit;')
+      .replace('#include <common>', '#include <common>\nvarying float vWin;\nvarying vec3 vGlassPos;\nuniform float uNight;\nuniform float uLit;')
       .replace('#include <color_fragment>', `#include <color_fragment>
         float wr = vWin;
         float wr2 = fract(wr * 7.13 + 0.31);
@@ -351,6 +351,22 @@ export function glassMaterial(): THREE.MeshStandardMaterial {
         inside = mix(inside, cloth * 0.55, curtain * 0.6);
         diffuseColor.rgb = inside;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        // Fake reflection: sky → horizon → ground by the reflected view ray, Fresnel-weighted,
+        // with soft diagonal glints that differ per pane.
+        vec3 vdir = normalize(vViewPosition);
+        vec3 rv = inverseTransformDirection(reflect(-vdir, normal), viewMatrix);
+        float fres = 0.18 + 0.82 * pow(1.0 - clamp(dot(normal, vdir), 0.0, 1.0), 4.0);
+        vec3 skyR = rv.y > 0.0 ? mix(vec3(0.82, 0.86, 0.9), vec3(0.42, 0.55, 0.72), pow(rv.y, 0.6)) : mix(vec3(0.6, 0.6, 0.58), vec3(0.18, 0.18, 0.17), pow(-rv.y, 0.5));
+        // Within the pane: brighter towards the top (sky) and a soft diagonal sheen band.
+        vec3 wn = inverseTransformDirection(normal, viewMatrix);
+        vec2 tg = length(wn.xz) > 1e-3 ? normalize(vec2(-wn.z, wn.x)) : vec2(1.0, 0.0);
+        float along = dot(vGlassPos.xz, tg);
+        float hgt = vGlassPos.y;
+        float top = smoothstep(-0.6, 0.9, fract(hgt / 3.8 + 0.15) - 0.5);
+        float band = fract((along * 0.9 + hgt * 0.75) * 0.55 + wr * 3.7);
+        float sheen = smoothstep(0.0, 0.08, band) * (1.0 - smoothstep(0.12, 0.3, band));
+        vec3 refl = skyR * fres * (0.45 + 0.35 * top) + vec3(0.9, 0.93, 0.97) * sheen * (0.22 + 0.3 * fres);
+        totalEmissiveRadiance += refl * (1.0 - curtain * 0.5) * (1.0 - uNight);
         float wlit = step(wr, uLit) * uNight;
         vec3 lamp = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.78, 0.5), wr2);
         totalEmissiveRadiance += lamp * wlit * (0.38 + 0.42 * wr2) * mix(1.0, 0.8, curtain);`);
