@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>City Generator</title>
+    <link rel="stylesheet" href="/src/city/city.css" />
+  </head>
+  <body>
+    <aside class="panel">
+      <header>
+        <h1>City Generator</h1>
+        <p class="sub">Street layer · <a href="./index.html">house editor →</a></p>
+      </header>
+
+      <section>
+        <h2>Street grid</h2>
+        <div class="row">
+          <label for="seed">Seed</label>
+          <div class="seed">
+            <input id="seed" type="text" spellcheck="false" />
+            <button id="dice" title="Random seed">⚄</button>
+          </div>
+        </div>
+        <div class="row">
+          <label for="pattern">Pattern</label>
+          <select id="pattern">
+            <option value="organic">Organic</option>
+            <option value="radial">Radial (spokes + rings)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="size">Size</label>
+          <div class="slider">
+            <input id="size" type="range" min="500" max="1000" step="20" />
+            <div class="slider-legend"><span>500 m</span><span id="size-v"></span><span>1000 m</span></div>
+          </div>
+        </div>
+        <div class="row">
+          <label for="block">Blocks</label>
+          <div class="slider">
+            <input id="block" type="range" min="1.2" max="1.6" step="0.05" />
+            <div class="slider-legend"><span>tight</span><span id="block-v"></span><span>large</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>House styles</h2>
+        <div id="styles" class="styles"></div>
+      </section>
+
+      <section>
+        <h2>View</h2>
+        <div class="row">
+          <label for="time">Time</label>
+          <select id="time"><option value="day">Day</option><option value="dusk">Dusk</option><option value="night">Night</option></select>
+        </div>
+        <div class="row">
+          <label for="detail">Detail</label>
+          <div class="slider">
+            <input id="detail" type="range" min="0" max="30" step="1" />
+            <div class="slider-legend"><span>massing only</span><span id="detail-v"></span><span>30 houses</span></div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="top">Top view</button>
+          <button id="home">Reset view</button>
+          <button id="regen">Regenerate</button>
+        </div>
+      </section>
+
+      <section class="grow">
+        <div class="section-head">
+          <h2>City</h2>
+          <span id="progress" class="dims"></span>
+        </div>
+        <ul id="stats" class="features"></ul>
+        <div id="pick" class="pick" hidden></div>
+      </section>
+    </aside>
+    <main id="viewport" class="viewport">
+      <canvas id="minimap" class="minimap" width="200" height="200"></canvas>
+    </main>
+    <script type="module" src="/src/city/main.ts"></script>
+  </body>
+</html>

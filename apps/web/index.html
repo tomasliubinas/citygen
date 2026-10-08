@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>House Generator</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <aside class="panel">
+      <header>
+        <h1>House Generator</h1>
+        <p class="sub">City generator · house layer · <a href="./city.html">open the city →</a></p>
+      </header>
+
+      <section>
+        <div class="section-head">
+          <h2>Building envelope</h2>
+          <span id="dims" class="dims"></span>
+        </div>
+        <canvas id="plan" class="plan"></canvas>
+        <p class="hint">Drag to draw · drag edges or corners to resize · drag inside to move · click an edge to make it the street front. Grid 2 m, snap 1 m.</p>
+        <div class="row">
+          <label>Front</label>
+          <div class="seg" id="front">
+            <button data-v="north">N</button><button data-v="east">E</button><button data-v="south">S</button><button data-v="west">W</button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Generator</h2>
+        <div class="row">
+          <label for="seed">Seed</label>
+          <div class="seed">
+            <input id="seed" type="text" spellcheck="false" />
+            <button id="dice" title="Random seed">⚄</button>
+          </div>
+        </div>
+        <div class="row">
+          <label for="centrality">Location</label>
+          <div class="slider">
+            <input id="centrality" type="range" min="0" max="1" step="0.01" />
+            <div class="slider-legend"><span>outskirts</span><span id="centrality-v"></span><span>city centre</span></div>
+          </div>
+        </div>
+        <div class="row">
+          <label for="floors">Floors</label>
+          <select id="floors">
+            <option value="auto">Auto (size + location)</option>
+            <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+        <div class="row">
+          <label for="style">Style</label>
+          <select id="style"></select>
+        </div>
+        <div class="row">
+          <label>Party walls</label>
+          <div class="check">
+            <label class="check"><input id="pw-left" type="checkbox" /> left</label>
+            <label class="check"><input id="pw-right" type="checkbox" /> right</label>
+          </div>
+        </div>
+        <div class="row">
+          <label for="time">Time</label>
+          <select id="time"><option value="day">Day</option><option value="dusk">Dusk</option><option value="night">Night</option></select>
+        </div>
+        <div class="row">
+          <label for="contract">Overlay</label>
+          <label class="check"><input id="contract" type="checkbox" /> Interior — remove walls &amp; roof, show all floors</label>
+        </div>
+      </section>
+
+      <section class="grow">
+        <div class="section-head">
+          <h2>Generated</h2>
+          <span id="timing" class="dims"></span>
+        </div>
+        <ul id="features" class="features"></ul>
+        <div class="actions">
+          <button id="download">Download spec JSON</button>
+          <button id="reset-view">Reset view</button>
+        </div>
+      </section>
+    </aside>
+    <main id="viewport" class="viewport">
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "citygen",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @citygen/web",
+    "build": "npm run build -w @citygen/web",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "house": "vite-node --config packages/house/vite.config.ts packages/house/cli.ts --"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vite-node": "^2.1.4",
+    "vitest": "^2.1.4"
+  }
+}

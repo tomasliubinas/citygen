@@ -1,0 +1,3 @@
+# Static multi-page build: stop the site-wide SPA rewrite from applying here.
+RewriteEngine Off
+DirectoryIndex index.html

@@ -1,0 +1,10 @@
+{
+  "name": "@citygen/house",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "House generator layer: (input, seed) -> semantic HouseSpec -> renderer-agnostic mesh. No DOM, no renderer.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": { "@citygen/core": "0.1.0" }
+}

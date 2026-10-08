@@ -1,0 +1,10 @@
+{
+  "name": "@citygen/interior",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Interior layer: HouseSpec -> rooms, partitions, doors, staircases (InteriorSpec) -> renderer-agnostic mesh. No DOM, no renderer.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": { "@citygen/core": "0.1.0", "@citygen/house": "0.1.0" }
+}

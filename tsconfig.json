@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@citygen/core": ["packages/core/src/index.ts"],
+      "@citygen/house": ["packages/house/src/index.ts"],
+      "@citygen/interior": ["packages/interior/src/index.ts"],
+      "@citygen/city": ["packages/city/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src", "packages/*/test", "packages/house/cli.ts", "apps/web/src"]
+}
