@@ -16,6 +16,7 @@ interface State {
   partyLeft: boolean;
   partyRight: boolean;
   time: 'day' | 'dusk' | 'night';
+  wear: number | null;
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -38,6 +39,7 @@ function readHash(): Partial<State> {
   if (p.get('style') && p.get('style')! in STYLES) out.style = p.get('style') as StyleId;
   if (p.get('interior') === '1') out.contract = true;
   if (p.get('pl') === '1') out.partyLeft = true;
+  if (p.has('wear')) out.wear = Number(p.get('wear'));
   const tm = p.get('time');
   if (tm === 'day' || tm === 'dusk' || tm === 'night') out.time = tm;
   if (p.get('pr') === '1') out.partyRight = true;
@@ -56,6 +58,7 @@ const state: State = {
   partyLeft: false,
   partyRight: false,
   time: 'day',
+  wear: null,
   ...readHash(),
 };
 
@@ -89,6 +92,12 @@ for (const [id, key] of [['pw-left', 'partyLeft'], ['pw-right', 'partyRight']] a
     schedule();
   });
 }
+const wear = $<HTMLSelectElement>('wear');
+wear.value = state.wear == null ? 'auto' : String(state.wear);
+wear.addEventListener('change', () => {
+  state.wear = wear.value === 'auto' ? null : Number(wear.value);
+  schedule();
+});
 const time = $<HTMLSelectElement>('time');
 time.value = state.time;
 time.addEventListener('change', () => {
@@ -209,6 +218,7 @@ function regenerate(): void {
     floors: state.floors,
     style: state.style,
     partyWalls: { left: state.partyLeft, right: state.partyRight },
+    wear: state.wear,
   });
   const mesh = buildHouseMesh(spec);
   const interior = planInterior(spec, { apartments: state.apartments });
@@ -247,6 +257,7 @@ function regenerate(): void {
   if (state.contract) p.set('interior', '1');
   if (state.partyLeft) p.set('pl', '1');
   if (state.time !== 'day') p.set('time', state.time);
+  if (state.wear != null) p.set('wear', String(state.wear));
   if (state.partyRight) p.set('pr', '1');
   if (state.floors != null) p.set('floors', String(state.floors));
   if (!camRestored && cameraFromHash(initialCam, viewer.camera, viewer.controls.target)) {

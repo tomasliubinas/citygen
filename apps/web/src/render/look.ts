@@ -79,33 +79,40 @@ const SURFACE = /* glsl */ `
 #ifndef LOOK_LITE
       c *= 0.955 + 0.09 * lookFbm(wp * 0.33);
       c = mix(c, c * vec3(0.975, 0.955, 0.9), uLookAge * 0.7);
-      float wear = smoothstep(0.1, 0.85, uLookAge);
-      // Faded paint: colour drains towards a warm grey.
-      float lum = dot(c, vec3(0.299, 0.587, 0.114));
-      c = mix(c, vec3(lum) * vec3(1.0, 0.985, 0.95), 0.4 * wear);
-      // Blotchy repaints: patches a shade lighter or darker.
-      float blot = lookFbm(wp * 0.16 + 11.0);
-      c *= 1.0 + wear * (smoothstep(0.58, 0.66, blot) * 0.06 - smoothstep(0.34, 0.26, blot) * 0.05);
-      // Rising damp: a darker, uneven band above the ground.
-      float damp = (1.0 - smoothstep(0.5, 1.2 + 0.5 * lookNoise(wp * 0.6), h)) * wear;
-      c *= 1.0 - 0.2 * damp;
-      // Peeling plaster: a few patches of bare grey render, mostly low on the wall.
-      if (uLookKind == 1) {
-        float pn = lookFbm(wp * 0.85 + 3.1) + 0.06 * (1.0 - smoothstep(0.8, 3.0, h));
-        float peel = smoothstep(0.735, 0.745, pn - 0.09 * wear + 0.09) * step(0.3, wear);
-        c = mix(c, vec3(0.6, 0.57, 0.53) * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * 0.85);
-      }
 #endif
     }
     if (brick > 0.5) c *= 1.0 - 0.08 * uLookAge;
     // Splash zone near the ground, rain streaks running down.
 #ifndef LOOK_LITE
-    float splash = (1.0 - smoothstep(0.0, 1.7 + uLookAge, h)) * (0.1 + 0.14 * lookFbm(wp * 1.3)) * (0.5 + uLookAge);
+    float splash = (1.0 - smoothstep(0.0, 1.0 + 1.4 * uLookAge, h)) * (0.1 + 0.14 * lookFbm(wp * 1.3)) * (0.3 + 1.6 * uLookAge);
     float streak = smoothstep(0.58 - 0.12 * uLookAge, 0.9, lookFbm(vec3(along * 2.6, h * 0.22, 3.7)));
-    c *= (1.0 - splash * 0.6) * (1.0 - (0.015 + 0.04 * uLookAge) * streak);
+    c *= (1.0 - splash) * (1.0 - 0.08 * uLookAge * streak);
 #else
     c *= 1.0 - 0.12 * (1.0 - smoothstep(0.0, 1.6, h));
 #endif
+#ifndef LOOK_LITE
+    {
+      // Wear on every wall material (plaster, ashlar, brick); trim weathers at half strength.
+      float wear = smoothstep(0.0, 0.9, uLookAge) * (uLookKind == 2 ? 0.5 : 1.0);
+      // Faded paint: colour drains towards a warm grey.
+      float lum = dot(c, vec3(0.299, 0.587, 0.114));
+      c = mix(c, vec3(lum) * vec3(0.97, 0.95, 0.9), 0.7 * wear);
+      c *= 1.0 - 0.14 * wear;
+      // Blotchy repaints: patches a shade lighter or darker.
+      float blot = lookFbm(wp * 0.16 + 11.0);
+      c *= 1.0 + wear * (smoothstep(0.58, 0.66, blot) * 0.06 - smoothstep(0.34, 0.26, blot) * 0.05);
+      // Rising damp: a darker, uneven band above the ground.
+      float damp = (1.0 - smoothstep(0.5, 1.2 + 0.5 * lookNoise(wp * 0.6), h)) * wear;
+      c *= 1.0 - 0.4 * damp;
+      // Peeling plaster: a few patches of bare grey render, mostly low on the wall.
+      if (uLookKind == 1 && brick < 0.5) {
+        float pn = lookFbm(wp * 0.85 + 3.1) + 0.06 * (1.0 - smoothstep(0.8, 3.0, h));
+        float peel = smoothstep(0.735, 0.745, pn - 0.18 * wear + 0.12) * smoothstep(0.15, 0.4, wear);
+        c = mix(c, vec3(0.6, 0.57, 0.53) * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * 0.85);
+      }
+    }
+#endif
+
   } else if (uLookKind == 4) {
     // Roof: staggered slates / tiles in rows, each a slightly different tone.
     float v = h / 0.115;
@@ -119,10 +126,17 @@ const SURFACE = /* glsl */ `
     c *= 1.0 - 0.18 * lookLine(u, 0.02) * fade;
 #ifndef LOOK_LITE
     float lichen = smoothstep(0.62 - 0.22 * uLookAge, 0.85, lookFbm(wp * 0.25));
-    c = mix(c, c * vec3(1.05, 1.14, 0.88), lichen * (0.2 + 0.8 * uLookAge));
+    c = mix(c, mix(c, vec3(0.34, 0.38, 0.22), 0.65), lichen * (0.1 + 0.9 * uLookAge));
     // Patchy repairs: a few replaced tiles in a fresher tone.
-    float rep = step(1.0 - 0.07 * smoothstep(0.1, 0.85, uLookAge), lookHash2(vec2(floor(u) + 17.0, row)));
+    float rwear = smoothstep(0.0, 0.9, uLookAge);
+    float rep = step(1.0 - 0.1 * rwear, lookHash2(vec2(floor(u) + 17.0, row)));
     c = mix(c, c * vec3(1.14, 1.06, 0.96), rep * fade);
+    // Re-roofed areas: whole patches of newer slates/tiles in a different tone, and weathered dark patches.
+    float pa = lookFbm(wp * 0.11 + 5.0);
+    float lumR = dot(c, vec3(0.3, 0.59, 0.11));
+    // Mix towards real colours so patches also show on dark slate.
+    c = mix(c, vec3(lumR) * 1.6 + vec3(0.05), smoothstep(0.6, 0.64, pa) * rwear * 0.75);
+    c = mix(c, vec3(0.2, 0.17, 0.13), smoothstep(0.38, 0.33, pa) * rwear * 0.6);
 #endif
   } else if (uLookKind == 5) {
 #ifndef LOOK_LITE

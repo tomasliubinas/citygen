@@ -25,6 +25,8 @@ export interface HouseInput {
    * the plot to that edge with a blind fire wall. left = −x, right = +x seen from the street.
    */
   partyWalls?: { left?: boolean; right?: boolean };
+  /** Wear override 0 (new) … 1 (derelict); null/undefined = from seed age and location. */
+  wear?: number | null;
 }
 
 export type FloorKind = 'ground' | 'main' | 'upper' | 'top';
@@ -293,7 +295,7 @@ export type EntranceComposition = 'frontispiece' | 'risalit' | 'giant-portico' |
  */
 export interface HouseSpec {
   schema: 'citygen.house/1';
-  input: Required<Omit<HouseInput, 'floors' | 'partyWalls'>> & { floors: number | null; partyWalls: { left: boolean; right: boolean } };
+  input: Required<Omit<HouseInput, 'floors' | 'partyWalls' | 'wear'>> & { floors: number | null; partyWalls: { left: boolean; right: boolean }; wear: number | null };
   genome: ManorGenome;
   placement: { x: number; z: number; rotationY: number };
   envelope: { width: number; depth: number };

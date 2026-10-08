@@ -57,6 +57,7 @@ export function normalizeInput(input: HouseInput): HouseSpec['input'] {
     floors: input.floors == null ? null : clamp(Math.round(input.floors), 1, MAX_FLOORS),
     style: input.style ?? 'classicist-manor',
     partyWalls: { left: !!input.partyWalls?.left, right: !!input.partyWalls?.right },
+    wear: input.wear == null ? null : clamp(input.wear, 0, 1),
   };
 }
 
@@ -1056,7 +1057,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       accent: g.colors.accent,
     },
     // Central façades are the kept-up, restored ones; wear builds up towards the outskirts.
-    weathering: { condition: r3(clamp(g.age * (1 - 0.65 * input.centrality), 0, 1)) },
+    weathering: { condition: r3(input.wear ?? clamp(g.age * (1 - 0.65 * input.centrality), 0, 1)) },
     wallThickness: WALL_THICKNESS,
     plinthHeight: r3(plinth),
     floors,

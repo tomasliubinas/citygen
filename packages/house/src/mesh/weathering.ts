@@ -12,8 +12,8 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
   const cond = spec.weathering.condition;
   buildRust(mb, spec, cond);
   buildCables(mb, spec, cond);
-  // Barely visible: nothing on newer houses, a faint trace on the oldest.
-  if (cond < 0.35) return;
+  // Fades in smoothly with wear: nothing on new houses, clear streaks on derelict ones.
+  if (cond < 0.05) return;
   const halfW = spec.envelope.width / 2;
   const pw = spec.input.partyWalls;
   const isParty = (f: FacadeSpec) =>
@@ -21,8 +21,22 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
   const e1 = spec.floors[1]?.elevation ?? Infinity;
   const rustTop = spec.rusticatedGround ? e1 - 0.17 : -Infinity;
   const wallTop = spec.roof.eaveY - spec.roof.corniceHeight;
-  const aTop = 0.03 + 0.12 * cond * cond;
+  const aTop = 0.6 * cond;
   const main = new Set(spec.facades);
+  // Inside (reflex) corners of the footprint ring, at facade start (0) or end (1).
+  const ring = spec.footprint;
+  const innerCorner = (fc: FacadeSpec, end: 0 | 1) => {
+    const i = spec.facades.indexOf(fc);
+    if (i < 0 || i >= ring.length) return false;
+    const n = ring.length;
+    const v = end === 0 ? i : (i + 1) % n;
+    const p = ring[(v - 1 + n) % n];
+    const q = ring[v];
+    const r2 = ring[(v + 1) % n];
+    const d1 = [q[0] - p[0], q[1] - p[1]];
+    const d2 = [r2[0] - q[0], r2[1] - q[1]];
+    return d1[1] * d2[0] - d1[0] * d2[1] < 0;
+  };
   const all = [...spec.facades, ...spec.towers.flatMap((t) => t.facades)];
 
   mb.paint('stain', () => {
@@ -50,10 +64,28 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
             mb.quadAlpha([cx, yb, z], [cx + hw, yb, z], [cx + hw, top, z], [cx, top, z], [0, 0, 0, a]);
           }
         }
+        // Ground dirt: splash-back rising from the base of the wall.
+        if (fc.length > 0.8) {
+          const gy = spec.plinthHeight;
+          const gh = 0.5 + 1.1 * cond;
+          const ga = 0.5 * cond;
+          mb.quadAlpha([0, gy, 0.013], [fc.length, gy, 0.013], [fc.length, gy + gh, 0.013], [0, gy + gh, 0.013], [ga, ga, 0, 0]);
+        }
+        // Grime collecting in inside corners (where two walls meet), full height.
+        const wallH = wallTop - spec.plinthHeight;
+        const ca = 0.45 * cond;
+        for (const end of [0, 1] as const) {
+          if (!main.has(fc) || !innerCorner(fc, end)) continue;
+          const u0 = end === 0 ? 0 : fc.length - 0.9;
+          const u1 = end === 0 ? 0.9 : fc.length;
+          const aL = end === 0 ? ca : 0;
+          const aR = end === 0 ? 0 : ca;
+          mb.quadAlpha([u0, spec.plinthHeight, 0.013], [u1, spec.plinthHeight, 0.013], [u1, spec.plinthHeight + wallH, 0.013], [u0, spec.plinthHeight + wallH, 0.013], [aL, aR, aR * 0.4, aL * 0.4]);
+        }
         // Soot and run-off under the cornice of the main body.
         if (main.has(fc) && fc.length > 1.2) {
           const drop = 0.45 + 0.9 * cond;
-          const a = 0.08 * cond * cond;
+          const a = 0.2 * cond * cond;
           mb.quadAlpha([0, wallTop - drop, 0.012], [fc.length, wallTop - drop, 0.012], [fc.length, wallTop, 0.012], [0, wallTop, 0.012], [0, 0, a, a]);
         }
       });
@@ -63,8 +95,8 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
 
 /** Rust bleeding down the wall from iron balconies and balconets. */
 function buildRust(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
-  if (cond < 0.3) return;
-  const a = 0.08 + 0.3 * (cond - 0.3);
+  if (cond < 0.08) return;
+  const a = 0.4 * cond * cond;
   mb.paint('rust', () => {
     for (const b of spec.balconies) {
       if (b.railing === 'stone' || b.side !== 'front') continue;
@@ -87,7 +119,8 @@ function buildRust(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
 /** Old cable runs on the street façade: a line under the first string course, dropping down a corner. */
 function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
   const r = Rng.create(spec.input.seed, 'cables');
-  if (cond < 0.3 || !r.chance(0.35 + 0.6 * cond)) return;
+  // Each house has its own wear level at which the cables appear (always by 0.65).
+  if (cond < r.range(0.12, 0.45)) return;
   const fronts = spec.facades.filter((f) => f.side === 'front' && f.normal[1] > 0.5 && f.length > 6);
   const fc = fronts.sort((p, q) => q.length - p.length)[0];
   if (!fc) return;
@@ -115,7 +148,9 @@ function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
       const ud = fromLeft ? u0 : u1;
       mb.beam([ud, y, out], [ud, spec.plinthHeight + 0.3, out], 0.022, 0.022);
       mb.box(ud - 0.14, spec.plinthHeight + 0.4, 0, ud + 0.14, spec.plinthHeight + 0.75, 0.09);
-      if (r.chance(0.5)) sag(u0 + 0.6, u1 - 0.6, y - 0.09);
+      // More lines on more worn houses.
+      if (cond > 0.4 || r.chance(0.5)) sag(u0 + 0.6, u1 - 0.6, y - 0.09);
+      if (cond > 0.7) sag(u0 + 1.2, u1 - 1.2, y - 0.18);
     }),
   );
 }
