@@ -86,7 +86,7 @@ const SURFACE = /* glsl */ `
 #ifndef LOOK_LITE
     float splash = (1.0 - smoothstep(0.0, 1.7 + uLookAge, h)) * (0.1 + 0.14 * lookFbm(wp * 1.3)) * (0.5 + uLookAge);
     float streak = smoothstep(0.58 - 0.12 * uLookAge, 0.9, lookFbm(vec3(along * 2.6, h * 0.22, 3.7)));
-    c *= (1.0 - splash) * (1.0 - (0.03 + 0.1 * uLookAge) * streak);
+    c *= (1.0 - splash * 0.6) * (1.0 - (0.015 + 0.04 * uLookAge) * streak);
 #else
     c *= 1.0 - 0.12 * (1.0 - smoothstep(0.0, 1.6, h));
 #endif

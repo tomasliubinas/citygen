@@ -10,7 +10,8 @@ import { facadeFrame } from './facade';
  */
 export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
   const cond = spec.weathering.condition;
-  if (cond < 0.12) return;
+  // Barely visible: nothing on newer houses, a faint trace on the oldest.
+  if (cond < 0.35) return;
   const halfW = spec.envelope.width / 2;
   const pw = spec.input.partyWalls;
   const isParty = (f: FacadeSpec) =>
@@ -18,7 +19,7 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
   const e1 = spec.floors[1]?.elevation ?? Infinity;
   const rustTop = spec.rusticatedGround ? e1 - 0.17 : -Infinity;
   const wallTop = spec.roof.eaveY - spec.roof.corniceHeight;
-  const aTop = 0.2 + 0.4 * cond;
+  const aTop = 0.03 + 0.12 * cond * cond;
   const main = new Set(spec.facades);
   const all = [...spec.facades, ...spec.towers.flatMap((t) => t.facades)];
 
@@ -50,7 +51,7 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
         // Soot and run-off under the cornice of the main body.
         if (main.has(fc) && fc.length > 1.2) {
           const drop = 0.45 + 0.9 * cond;
-          const a = 0.3 * cond;
+          const a = 0.08 * cond * cond;
           mb.quadAlpha([0, wallTop - drop, 0.012], [fc.length, wallTop - drop, 0.012], [fc.length, wallTop, 0.012], [0, wallTop, 0.012], [0, 0, a, a]);
         }
       });
