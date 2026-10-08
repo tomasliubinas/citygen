@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { createLook, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from './render/look';
 import type { InteriorSpec } from '@citygen/interior';
 import type { MeshData } from '@citygen/core';
@@ -37,7 +38,7 @@ export class HouseViewer {
   private look: Look;
   private sunKey = '';
   private stain: THREE.MeshStandardMaterial | null = null;
-  private glass = glassMaterial();
+  private glass = (() => { const g = glassMaterial(); g.name = 'glass'; return g; })();
   private hemi!: THREE.HemisphereLight;
   private sunElevation = 1;
   private interior = new THREE.Group();
@@ -104,6 +105,7 @@ export class HouseViewer {
     if (!m) {
       const look = LOOK[slot] ?? { roughness: 0.8, metalness: 0 };
       m = enhanceMaterial(new THREE.MeshStandardMaterial({ ...look, side: look.side ?? THREE.FrontSide }), kindForSlot(slot));
+      m.name = slot;
       this.materials.set(slot, m);
     }
     m.color.set(color);
@@ -286,7 +288,7 @@ export class HouseViewer {
         g.setIndex(new THREE.BufferAttribute(buf.indices, 1));
         let m = this.interiorMaterials.get(slot);
         if (!m) {
-          m = new THREE.MeshStandardMaterial({ roughness: slot === 'windowMark' ? 0.2 : 0.8, metalness: slot === 'rail' ? 0.5 : 0 });
+          m = new THREE.MeshStandardMaterial({ roughness: slot === 'windowMark' ? 0.2 : 0.8, metalness: slot === 'rail' ? 0.5 : 0, name: slot });
           this.interiorMaterials.set(slot, m);
         }
         m.color.set(spec.palette[slot] ?? '#cccccc');
@@ -315,6 +317,38 @@ export class HouseViewer {
       mm.opacity = gm.opacity;
       mm.depthWrite = gm.depthWrite;
     }
+  }
+
+  /**
+   * The visible model (house, or the interior when it is shown) as binary glTF.
+   * Plain PBR materials with the house palette; procedural shader detail is not baked.
+   */
+  async exportGLB(): Promise<ArrayBuffer> {
+    const src = this.interior.visible ? this.interior : this.house;
+    const out = new THREE.Group();
+    out.name = this.interior.visible ? 'interior' : 'house';
+    const mats = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+    src.updateMatrixWorld(true);
+    src.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || !o.visible) return;
+      const m = o.material as THREE.MeshStandardMaterial;
+      // Stain decals are a shader overlay; leave them out of the model.
+      if (m.vertexColors) return;
+      let pm = mats.get(m);
+      if (!pm) {
+        pm = new THREE.MeshStandardMaterial({ color: m.color, roughness: m.roughness, metalness: m.metalness, side: m.side, transparent: m.transparent, opacity: m.opacity });
+        pm.name = m.name || `${o.name || 'part'}`;
+        mats.set(m, pm);
+      }
+      const g = new THREE.BufferGeometry();
+      for (const k of ['position', 'normal']) if (o.geometry.getAttribute(k)) g.setAttribute(k, o.geometry.getAttribute(k));
+      if (o.geometry.index) g.setIndex(o.geometry.index);
+      const copy = new THREE.Mesh(g, pm);
+      copy.applyMatrix4(o.matrixWorld);
+      out.add(copy);
+    });
+    const result = await new GLTFExporter().parseAsync(out, { binary: true });
+    return result as ArrayBuffer;
   }
 }
 

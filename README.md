@@ -15,6 +15,7 @@ Procedural 3D city generator in the browser: seeded, style-aware historic houses
 - **Interior layer**: cellar, floors, attic and tower rooms; staircases; every room reachable by doors; flats in large houses.
 - **Seeded and stable**: the same seed gives the same house; resizing keeps its character.
 - Day / dusk / night lighting, weathering, camera and settings stored in the URL.
+- Download the house (or its interior) as a 3D model (.glb) for Blender, game engines and viewers.
 
 The engine (`packages/*`) is plain TypeScript with no DOM or renderer; the web app (`apps/web`) is a three.js viewer on top of it.
 

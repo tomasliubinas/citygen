@@ -151,6 +151,21 @@ function writeCam(): void {
 }
 
 let current: HouseSpec | null = null;
+$('download-glb').addEventListener('click', async () => {
+  if (!current) return;
+  const btn = $<HTMLButtonElement>('download-glb');
+  btn.disabled = true;
+  try {
+    const glb = await viewer.exportGLB();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([glb], { type: 'model/gltf-binary' }));
+    a.download = `house-${current.input.seed || 'seed'}-${current.input.style}${state.contract ? '-interior' : ''}.glb`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } finally {
+    btn.disabled = false;
+  }
+});
 $('download').addEventListener('click', () => {
   if (!current) return;
   const blob = new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' });
