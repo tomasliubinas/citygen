@@ -67,8 +67,8 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
         // Ground dirt: splash-back rising from the base of the wall.
         if (fc.length > 0.8) {
           const gy = spec.plinthHeight;
-          const gh = 0.5 + 1.1 * cond;
-          const ga = 0.5 * cond;
+          const gh = 0.6 + 1.4 * cond;
+          const ga = 0.7 * cond;
           mb.quadAlpha([0, gy, 0.013], [fc.length, gy, 0.013], [fc.length, gy + gh, 0.013], [0, gy + gh, 0.013], [ga, ga, 0, 0]);
         }
         // Grime collecting in inside corners (where two walls meet), full height.
