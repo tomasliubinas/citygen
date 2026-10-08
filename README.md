@@ -2,7 +2,7 @@
 
 Procedural 3D city generator in the browser: seeded, style-aware historic houses with interiors, from street grid to rooms.
 
-**Live:** [house editor](https://zodele.lt/citygen/) · [city](https://zodele.lt/citygen/city.html)
+**Live demo:** [zodele.lt/citygen](https://zodele.lt/citygen/) · [city view](https://zodele.lt/citygen/city.html)
 
 ![House editor](docs/screenshots/house.jpg)
 
