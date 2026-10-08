@@ -105,10 +105,12 @@ const SURFACE = /* glsl */ `
       float damp = (1.0 - smoothstep(0.5, 1.2 + 0.5 * lookNoise(wp * 0.6), h)) * wear;
       c *= 1.0 - 0.4 * damp;
       // Peeling plaster: a few patches of bare grey render, mostly low on the wall.
-      if (uLookKind == 1 && brick < 0.5) {
+      if ((uLookKind == 1 && brick < 0.5) || (uLookKind == 3 && h > 1.2)) {
         float pn = lookFbm(wp * 0.85 + 3.1) + 0.06 * (1.0 - smoothstep(0.8, 3.0, h));
         float peel = smoothstep(0.735, 0.745, pn - 0.18 * wear + 0.12) * smoothstep(0.15, 0.4, wear);
-        c = mix(c, vec3(0.6, 0.57, 0.53) * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * 0.85);
+        // Plaster flakes off to grey render; stone erodes to a darker, rougher surface.
+        vec3 under = uLookKind == 1 ? vec3(0.6, 0.57, 0.53) : c * vec3(0.78, 0.76, 0.72);
+        c = mix(c, under * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * 0.85);
       }
     }
 #endif
@@ -125,14 +127,15 @@ const SURFACE = /* glsl */ `
     c *= mix(1.0, 0.8 + 0.2 * smoothstep(0.0, 0.3, fract(v)), fade);
     c *= 1.0 - 0.18 * lookLine(u, 0.02) * fade;
 #ifndef LOOK_LITE
-    float lichen = smoothstep(0.62 - 0.22 * uLookAge, 0.85, lookFbm(wp * 0.25));
-    c = mix(c, mix(c, vec3(0.34, 0.38, 0.22), 0.65), lichen * (0.1 + 0.9 * uLookAge));
+    float lichen = smoothstep(0.66 - 0.12 * uLookAge, 0.85, lookFbm(wp * 0.5));
+    c = mix(c, mix(c, vec3(0.34, 0.38, 0.22), 0.5), lichen * smoothstep(0.3, 1.0, uLookAge) * 0.6);
     // Patchy repairs: a few replaced tiles in a fresher tone.
-    float rwear = smoothstep(0.0, 0.9, uLookAge);
+    // Roofs weather later and more gently than walls.
+    float rwear = smoothstep(0.35, 1.0, uLookAge) * 0.7;
     float rep = step(1.0 - 0.1 * rwear, lookHash2(vec2(floor(u) + 17.0, row)));
     c = mix(c, c * vec3(1.14, 1.06, 0.96), rep * fade);
     // Re-roofed areas: whole patches of newer slates/tiles in a different tone, and weathered dark patches.
-    float pa = lookFbm(wp * 0.11 + 5.0);
+    float pa = lookFbm(wp * 0.33 + 5.0);
     float lumR = dot(c, vec3(0.3, 0.59, 0.11));
     // Mix towards real colours so patches also show on dark slate.
     c = mix(c, vec3(lumR) * 1.6 + vec3(0.05), smoothstep(0.6, 0.64, pa) * rwear * 0.75);
