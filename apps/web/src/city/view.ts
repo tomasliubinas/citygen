@@ -93,6 +93,9 @@ export class CityView {
     this.scene.add(this.sun, this.sun.target, this.ground, this.massing, this.detail, this.highlight);
 
     this.controls = new MapControls(this.camera, this.renderer.domElement);
+    // Same mouse scheme as the house page: left = rotate, right (or Shift/Ctrl + left) = pan.
+    this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+    this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI * 0.47;
     this.controls.minDistance = 15;
