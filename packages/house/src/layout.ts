@@ -363,7 +363,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     const half = doorW / 2 + 1.25;
     stairs.push({
       id: 's-entrance', role: 'entrance', x0: -half, x1: half, zStart: zRis, zEnd: D / 2,
-      landing: LANDING, fromY: 0, toY: plinth, steps, direction: 'front', railing: g.balustrade, pedestals: true,
+      landing: LANDING, fromY: 0, toY: plinth, steps, direction: 'front', railing: g.balustrade, pedestals: g.glazing !== 'deco',
     });
   }
 
@@ -436,8 +436,10 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
           ? 1.5
           : doorSurround === 'canopy'
             ? 1.25
-          : doorSurround === 'stepped' || doorSurround === 'slab'
-            ? 1.5
+          : doorSurround === 'stepped'
+            ? 1.05
+          : doorSurround === 'slab'
+            ? 0.75
           : doorSurround === 'lantern'
             ? 1.0
           : g.doorStyle === 'gateway'
@@ -455,24 +457,26 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     const e = f.elevation;
     const H = f.height;
     const single = nFloors === 1;
+    // Art Deco windows: clean flat frames — no crowns, aprons or consoles.
+    const plain = (w: WinProfile): WinProfile => (g.glazing === 'deco' ? { ...w, crown: 'none', apron: false, sillConsoles: false } : w);
     switch (f.kind) {
       case 'ground': {
         const head = g.archedGround ? 'arched' : g.windowHead;
         const crown: WindowCrown =
           single && primary ? crownPattern(d) : head === 'arched' || g.rusticatedGround ? 'keystone' : 'cornice';
-        return { sill: e + 0.95, height: Math.min(winW * g.windowRatio, H - 0.95 - 0.8), head, crown, apron: single && primary, sillConsoles: single && primary };
+        return plain({ sill: e + 0.95, height: Math.min(winW * g.windowRatio, H - 0.95 - 0.8), head, crown, apron: single && primary, sillConsoles: single && primary });
       }
       case 'main':
-        return {
+        return plain({
           sill: e + 0.8,
           height: Math.min(winW * g.windowRatio * 1.1, H - 0.8 - 1.0),
           head: g.windowHead,
           crown: primary ? crownPattern(d) : 'cornice',
           apron: primary,
           sillConsoles: primary,
-        };
+        });
       case 'upper':
-        return { sill: e + 0.85, height: Math.min(winW * g.windowRatio * 0.92, H - 0.85 - 0.7), head: g.windowHead, crown: primary ? (g.crown === 'secession' ? 'secession' : 'cornice') : 'none', apron: false, sillConsoles: false };
+        return plain({ sill: e + 0.85, height: Math.min(winW * g.windowRatio * 0.92, H - 0.85 - 0.7), head: g.windowHead, crown: primary ? (g.crown === 'secession' ? 'secession' : 'cornice') : 'none', apron: false, sillConsoles: false });
       default:
         return { sill: e + 0.8, height: Math.min(winW * 1.25, H - 0.8 - 0.95), head: g.windowHead, crown: 'none', apron: false, sillConsoles: false };
     }
@@ -514,7 +518,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
         const gateway = g.doorStyle === 'gateway';
         addOpening(fc, {
           kind: 'door', floor: 0, u: uOf(fc, x, z), sill: f.elevation, width: gateway ? clamp(bayW - 0.7, 2.2, 3.0) : doorW,
-          height: Math.min(f.height - doorMargin, gateway ? 3.9 : fan ? 3.6 : 3.2), head: fan || gateway ? 'arched' : 'flat',
+          height: Math.min(f.height - doorMargin, gateway ? 3.9 : g.glazing === 'deco' ? 3.5 : fan ? 3.6 : 3.2), head: fan || gateway ? 'arched' : 'flat',
           crown: 'none', apron: false, sillConsoles: false,
         });
         continue;
@@ -761,7 +765,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       pilasters.push({ facadeId: centralFront.id, u: uOf(centralFront, col.x, zMain), width: col.diameter * 0.9, y0: plinth, y1: portico.entablatureBottom, style: 'classical' });
     }
   }
-  if (g.corners !== 'quoins') {
+  if (g.corners === 'pilasters' || g.corners === 'lesenes') {
     for (const fc of facades) {
       if (fc.length < 3) continue;
       if (fc.side === 'front' && Math.abs(fc.a[1] - zRis) < 1e-3 && zRis > zMain) continue;
@@ -777,7 +781,10 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       for (let k = 1; k < n; k++) {
         const x = centers[0] - bayW / 2 + k * bayW;
         if (x < Math.min(fc.a[0], fc.b[0]) + 0.3 || x > Math.max(fc.a[0], fc.b[0]) - 0.3) continue;
-        pilasters.push({ facadeId: fc.id, u: uOf(fc, x, fc.a[1]), width: 0.22, y0: plinth, y1: wallTop, style: 'strip' });
+        const u = uOf(fc, x, fc.a[1]);
+        // Skip where a pilaster already stands (overlapping faces flicker).
+        if (pilasters.some((p) => p.facadeId === fc.id && Math.abs(p.u - u) < p.width / 2 + 0.2)) continue;
+        pilasters.push({ facadeId: fc.id, u, width: 0.22, y0: plinth, y1: wallTop, style: 'strip' });
       }
     }
   }
@@ -788,7 +795,11 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     const strip = g.entranceStrip && nFloors >= 2;
     const y = strip ? top.elevation + top.height * 0.5 : plinth + floors[0].height * 0.55;
     const dx = strip ? bayW * 0.5 : doorW / 2 + 0.85;
-    for (const s of [-1, 1]) ornaments.push({ kind: 'porthole', facadeId: centralFront.id, u: r3(uOf(centralFront, s * dx, zRis)), y: r3(y), radius: 0.36 });
+    for (const s of [-1, 1]) {
+      const u = uOf(centralFront, s * dx, zRis);
+      if (pilasters.some((p) => p.facadeId === centralFront.id && Math.abs(p.u - u) < p.width / 2 + 0.5)) continue;
+      ornaments.push({ kind: 'porthole', facadeId: centralFront.id, u: r3(u), y: r3(y), radius: 0.36 });
+    }
   }
 
   // ---- Roof --------------------------------------------------------------------
