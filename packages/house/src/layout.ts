@@ -1004,7 +1004,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
   if (g.towerPlan === 'corner' && towers.length) features.push(`Octagonal corner tower with ${g.towerRoof === 'bell' ? 'a bell' : 'a conical'} roof`);
   if (g.towerPlan === 'gate' && towers.length) features.push(`Square gate tower, ${towers[0].stages} storey${towers[0].stages > 1 ? 's' : ''} above the eaves`);
   if (g.style === 'klaipeda') features.push('Red brick on a fieldstone base, brick corbel frieze, crow-stepped gable');
-  if (g.style === 'kaunas-deco') features.push(`Stepped attic over the centre, flat bands, three-part windows${g.entranceStrip ? ', vertical glazed strip over the entrance' : ''}, stepped portal with flagpole`);
+  if (g.style === 'kaunas-deco') features.push(`Stepped attic over the centre, flat bands, three-part windows${g.entranceStrip ? ', vertical glazed strip over the entrance' : ''}`);
   if (g.style === 'vilnius-old-town') features.push(`${g.gableShape === 'volute' ? 'Baroque volute gable, ' : ''}arched gateway to the courtyard, eared window frames`);
   if (g.towerPlan === 'castle') {
     if (towers.some((tw) => tw.role === 'gate')) features.push(`Square gate tower, ${towers.find((tw) => tw.role === 'gate')!.stages} storeys above the palace, pyramid roof`);

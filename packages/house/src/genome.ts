@@ -444,7 +444,7 @@ export const KAUNAS_DECO: StylePreset = {
   chance: {
     rusticatedGround: 0.35, archedGround: 0, endWings: 0.4, wingBalconies: 0.6, porticoBalcony: 0, fanlight: 0, oculus: 0,
     dentils: 0, pairedColumns: 0, parapet: 0, balconets: 0.5, cresting: 0, tower: 0, smallPanes: 0, accentFrieze: 0.25,
-    stringCourses: 1, entranceStrip: 0.65, flagpole: 0.55, decoBands: 0.45, portholes: 0.4, fluting: 0.35, groundCladding: 0.5,
+    stringCourses: 1, entranceStrip: 0.65, flagpole: 0, decoBands: 0.45, portholes: 0.4, fluting: 0.35, groundCladding: 0.5,
   },
   colors: {
     wall: [['#e4e1d9', 3], ['#ddd6c6', 2], ['#e6d9bd', 2], ['#d6d8d2', 1.5], ['#e9dcc3', 1], ['#cfd5cb', 1]],
