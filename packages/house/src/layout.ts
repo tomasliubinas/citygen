@@ -867,13 +867,21 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     for (const fc of tw.facades) {
       for (const o of fc.openings) {
         if (o.floor < nFloors) continue;
-        const px = o.position[0] + fc.normal[0] * 0.6;
-        const pz = o.position[2] + fc.normal[1] * 0.6;
-        if (px < main.x0 || px > main.x1 || pz < main.z0 || pz > main.z1) continue;
-        need = Math.max(need, roofHeightAt(main, px, pz) + 0.15 - o.sill);
+        // Sample across the whole window width and out to the eave edge.
+        const dx = (fc.b[0] - fc.a[0]) / fc.length;
+        const dz = (fc.b[1] - fc.a[1]) / fc.length;
+        for (const side of [-0.5, 0, 0.5]) {
+          for (const outD of [0.2, 0.6, 1.0, 1.4]) {
+            const px = o.position[0] + dx * o.width * side + fc.normal[0] * outD;
+            const pz = o.position[2] + dz * o.width * side + fc.normal[1] * outD;
+            if (px < main.x0 || px > main.x1 || pz < main.z0 || pz > main.z1) continue;
+            need = Math.max(need, roofHeightAt(main, px, pz) + 0.15 - o.sill);
+          }
+        }
       }
     }
-    const shift = Math.max(0, need);
+    // Plus half a metre of clear wall under the belvedere windows.
+    const shift = Math.max(0, need) + (need > -0.5 ? 0.5 : 0);
     if (shift <= 0) continue;
     tw.stageBase = r3(tw.stageBase + shift);
     tw.wallTop = r3(tw.wallTop + shift);
