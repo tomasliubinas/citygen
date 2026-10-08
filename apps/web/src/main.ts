@@ -20,6 +20,9 @@ interface State {
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
+/** Showcase seed per style on the house page (default: amber). */
+const STYLE_SEEDS: Partial<Record<StyleId, string>> = { 'kaunas-deco': 'linden-826' };
+
 const WORDS = ['linden', 'oak', 'amber', 'birch', 'heron', 'marble', 'willow', 'aster', 'cedar', 'rowan', 'juniper', 'elm', 'sorrel', 'lark', 'meadow', 'hazel'];
 
 function readHash(): Partial<State> {
@@ -98,6 +101,11 @@ const style = $<HTMLSelectElement>('style');
 style.replaceChildren(...Object.values(STYLES).map((p) => Object.assign(document.createElement('option'), { value: p.id, textContent: p.label })));
 style.value = state.style;
 style.addEventListener('change', () => {
+  // A style's showcase seed replaces the previous style's default (never a seed the user typed).
+  if (state.seed === (STYLE_SEEDS[state.style] ?? 'amber')) {
+    state.seed = STYLE_SEEDS[style.value as StyleId] ?? 'amber';
+    seedInput.value = state.seed;
+  }
   state.style = style.value as StyleId;
   schedule();
 });

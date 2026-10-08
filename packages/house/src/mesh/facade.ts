@@ -133,7 +133,7 @@ export function buildFacades(mb: MeshBuilder, spec: HouseSpec): void {
       for (const p of spec.pilasters) {
         if (p.facadeId !== fc.id) continue;
         if (p.style === 'lesene') lesene(mb, p.u, p.width, p.y0, p.y1);
-        else if (p.style === 'strip') mb.paint('trim', () => mb.box(p.u - p.width / 2, p.y0, 0, p.u + p.width / 2, p.y1, 0.06));
+        else if (p.style === 'strip') mb.paint('trim', () => mb.box(p.u - p.width / 2, p.y0, 0, p.u + p.width / 2, p.y1, 0.12));
         else pilaster(mb, p.u, p.width, p.y0, p.y1, 0);
       }
 
@@ -146,9 +146,11 @@ export function buildFacades(mb: MeshBuilder, spec: HouseSpec): void {
       if (spec.genome.accentFrieze) frieze(mb, fc, holes, wallTop, cx);
       if (spec.genome.decoBands) {
         // Interwar horizontal emphasis: a dark band under the windows of every upper floor.
+        // Bands stop at pilasters/lesenes instead of running through them.
+        const piers = spec.pilasters.filter((p) => p.facadeId === fc.id).map((p) => ({ u0: p.u - p.width / 2 - 0.06, u1: p.u + p.width / 2 + 0.06, v0: -1, v1: 999 }));
         mb.paint('accent', () => {
           for (const f of spec.floors.slice(1)) {
-            for (const r of cutRects(cx.start ? -0.02 : 0, fc.length + (cx.end ? 0.02 : 0), f.elevation + 0.12, f.elevation + 0.42, holes)) mb.box(r.u0, r.v0, 0, r.u1, r.v1, 0.02);
+            for (const r of cutRects(cx.start ? -0.02 : 0, fc.length + (cx.end ? 0.02 : 0), f.elevation + 0.12, f.elevation + 0.42, [...holes, ...piers])) mb.box(r.u0, r.v0, 0, r.u1, r.v1, 0.02);
           }
         });
       }
@@ -221,7 +223,7 @@ export function pilaster(mb: MeshBuilder, u: number, w: number, y0: number, y1: 
   mb.paint('trim', () => {
     mb.box(u - h - 0.05, y0, out0, u + h + 0.05, y0 + 0.28, out0 + 0.14);
     mb.box(u - h - 0.02, y0 + 0.28, out0, u + h + 0.02, y0 + 0.36, out0 + 0.11);
-    mb.box(u - h, y0 + 0.36, out0, u + h, y1 - 0.38, out0 + 0.09);
+    mb.box(u - h, y0 + 0.36, out0, u + h, y1 - 0.38, out0 + 0.12);
     mb.box(u - h - 0.02, y1 - 0.38, out0, u + h + 0.02, y1 - 0.3, out0 + 0.11);
     mb.box(u - h - 0.05, y1 - 0.3, out0, u + h + 0.05, y1 - 0.13, out0 + 0.14);
     mb.box(u - h - 0.09, y1 - 0.13, out0, u + h + 0.09, y1, out0 + 0.18);
@@ -512,9 +514,11 @@ function doorDetail(mb: MeshBuilder, o: OpeningSpec, out0: number, surround: Doo
   }
   if ((surround === 'stepped' || surround === 'slab') && flagpole) {
     mb.paint('metal', () => {
-      const yb = yH + (surround === 'slab' ? 0.9 : 0.8);
-      mb.box(o.u - 0.08, yb, out0, o.u + 0.08, yb + 0.2, out0 + 0.12);
-      mb.beam([o.u, yb + 0.1, out0 + 0.08], [o.u, yb + 1.6, out0 + 1.5], 0.05, 0.05);
+      // Beside the portal, leaning out and away — never in front of the glazed strip above the door.
+      const xb = o.u + w / 2 + 1.0;
+      const yb = yH + (surround === 'slab' ? 0.4 : 0.3);
+      mb.box(xb - 0.08, yb, out0, xb + 0.08, yb + 0.2, out0 + 0.12);
+      mb.beam([xb, yb + 0.1, out0 + 0.08], [xb + 0.7, yb + 1.5, out0 + 1.4], 0.05, 0.05);
     });
   }
 }
@@ -548,11 +552,11 @@ function canopy(mb: MeshBuilder, x0: number, x1: number, y: number): void {
 function lesene(mb: MeshBuilder, u: number, w: number, y0: number, y1: number): void {
   const h = w / 2;
   mb.paint('trim', () => {
-    mb.box(u - h, y0, 0, u + h, y1 - 0.7, 0.05);
-    mb.box(u - h - 0.04, y1 - 0.7, 0, u + h + 0.04, y1 - 0.05, 0.08);
-    for (const k of [-1, 0, 1]) mb.box(u + k * 0.1 - 0.02, y1 - 1.25, 0.05, u + k * 0.1 + 0.02, y1 - 0.7, 0.075);
+    mb.box(u - h, y0, 0, u + h, y1 - 0.7, 0.13);
+    mb.box(u - h - 0.04, y1 - 0.7, 0, u + h + 0.04, y1 - 0.05, 0.16);
+    for (const k of [-1, 0, 1]) mb.box(u + k * 0.1 - 0.02, y1 - 1.25, 0.13, u + k * 0.1 + 0.02, y1 - 0.7, 0.155);
   });
-  mb.paint('accent', () => mb.arcBand(u, y1 - 0.38, 0, Math.min(w * 0.3, 0.13), 0, Math.PI * 2, 0.08, 0.11, 16));
+  mb.paint('accent', () => mb.arcBand(u, y1 - 0.38, 0, Math.min(w * 0.3, 0.13), 0, Math.PI * 2, 0.16, 0.19, 16));
 }
 
 /** Glazed-tile frieze band under the eaves, interrupted by openings. */
