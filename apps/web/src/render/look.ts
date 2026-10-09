@@ -93,7 +93,10 @@ const SURFACE = /* glsl */ `
 #ifndef LOOK_LITE
     {
       // Wear on every wall material (plaster, ashlar, brick); trim weathers at half strength.
-      float wear = smoothstep(0.0, 0.9, uLookAge) * (uLookKind == 2 ? 0.5 : 1.0);
+      float wear = smoothstep(0.0, 0.9, uLookAge) * (uLookKind == 2 ? 0.85 : 1.0);
+      // Aged whites: stucco and trim drift to a dull ivory-grey (a multiply, never an overlay).
+      float whiteness = smoothstep(0.7, 0.9, min(c.r, min(c.g, c.b)));
+      c *= mix(vec3(1.0), vec3(0.86, 0.83, 0.76), wear * (0.35 + 0.65 * whiteness));
       // Faded paint: colour drains towards a warm grey.
       float lum = dot(c, vec3(0.299, 0.587, 0.114));
       c = mix(c, vec3(lum) * vec3(0.97, 0.95, 0.9), 0.7 * wear);

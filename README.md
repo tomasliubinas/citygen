@@ -11,7 +11,7 @@ Procedural 3D city generator in the browser: seeded, style-aware historic houses
 ## What it does
 
 - **City layer**: organic or radial street grid, blocks, plots sized by distance to the centre, terraced rows in the core, parks in leftover land.
-- **House layer**: draw a building envelope; the generator picks floors, bays, entrance, roof and façade detail. Seven styles: Kaunas Art Deco, Vilnius Old Town, Klaipėda brick, Classicist manor, Beaux-Arts, Art Nouveau, French Classical. Courtyard plans (U / closed) on deep plots, party walls for terraced houses.
+- **House layer**: draw a building envelope; the generator picks floors, bays, entrance, roof and façade detail. Seven styles: Kaunas Art Deco, Vilnius Baroque, Klaipėda brick, Classicist manor, Beaux-Arts, Art Nouveau, French Classical. Courtyard plans (U / closed) on deep plots, party walls for terraced houses.
 - **Interior layer**: cellar, floors, attic and tower rooms; staircases; every room reachable by doors; flats in large houses.
 - **Seeded and stable**: the same seed gives the same house; resizing keeps its character.
 - Day / dusk / night lighting, weathering, camera and settings stored in the URL.

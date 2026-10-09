@@ -458,13 +458,13 @@ export const KAUNAS_DECO: StylePreset = {
 };
 
 /**
- * Vilnius Old Town (late Baroque townhouses): two or three floors of warm pastel
+ * Vilnius (late Baroque old-town houses): two or three floors of warm pastel
  * plaster, steep red clay-tile roofs with small dormers, curving volute gables,
  * eared window frames and wide arched gateways into the courtyard.
  */
 export const VILNIUS_OLD_TOWN: StylePreset = {
   id: 'vilnius-old-town',
-  label: 'Vilnius Old Town (Baroque)',
+  label: 'Vilnius (Baroque)',
   bayWidth: [2.9, 3.4],
   plinthHeight: [0.25, 0.45],
   floorHeights: { ground: [3.8, 4.2], main: [3.8, 4.2], upper: [3.4, 3.7], top: [3.2, 3.4] },
