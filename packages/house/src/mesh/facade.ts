@@ -79,12 +79,15 @@ export function headOf(o: OpeningSpec): Head | null {
 
 /** Seed of the house being built: gives every pane its own random value (glass `alpha` = window id). */
 let glassSeed = '';
-const paneValue = (id: string) => hash32(`${glassSeed}/${id}`) / 4294967296;
+let glassWear = 0;
+/** Pane value = random fraction (curtains etc.) + integer wear bucket 0…10 of the house. */
+const paneValue = (id: string) => hash32(`${glassSeed}/${id}`) / 4294967296 + Math.round(glassWear * 10);
 
 export type DoorSurround = HouseSpec['composition']['doorSurround'];
 
 export function buildFacades(mb: MeshBuilder, spec: HouseSpec): void {
   glassSeed = spec.input.seed;
+  glassWear = spec.weathering.condition;
   const t = spec.wallThickness;
   const eave = spec.roof.eaveY;
   const wallTop = eave - spec.roof.corniceHeight + 0.05;
@@ -608,6 +611,7 @@ function eaveBrackets(mb: MeshBuilder, fc: FacadeSpec, eave: number, overhang: n
  */
 export function buildSimpleFacade(mb: MeshBuilder, spec: HouseSpec, fc: FacadeSpec, y0: number, y1: number, thickness: number, frieze_?: [number, number]): void {
   glassSeed = spec.input.seed;
+  glassWear = spec.weathering.condition;
   const holes = fc.openings.map(holeOf);
   mb.with(facadeFrame(fc), () => {
     mb.paint('wall', () => {

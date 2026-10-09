@@ -40,7 +40,7 @@ export function buildRoof(mb: MeshBuilder, spec: HouseSpec): void {
   for (const c of spec.chimneys) chimney(mb, c);
   const pitch = spec.roof.parts[0].pitch;
   for (const d of spec.dormers) {
-    mb.value = hash32(`${spec.input.seed}/${d.id}`) / 4294967296;
+    mb.value = hash32(`${spec.input.seed}/${d.id}`) / 4294967296 + Math.round(spec.weathering.condition * 10);
     if (d.side === 'front') dormer(mb, d.x, d.zFace, d, pitch);
     else mb.with(rotationY(Math.PI), () => dormer(mb, -d.x, -d.zFace, d, pitch));
     mb.value = null;

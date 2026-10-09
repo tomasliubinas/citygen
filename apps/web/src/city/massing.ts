@@ -82,7 +82,7 @@ function windowPanes(facades: FacadeSpec[], spec: HouseSpec): { frames: THREE.Bu
       const isDoor = o.kind === 'door' || o.kind === 'garden-door';
       rect(fc, u0 - 0.13, u1 + 0.13, o.sill - 0.1, top + 0.14, 0.03, frame);
       if (isDoor) rect(fc, u0, u1, o.sill, top, 0.05, door);
-      else rect(fc, u0, u1, o.sill, top, 0.05, glass, hash32(`${spec.input.seed}/${o.id}`) / 4294967296);
+      else rect(fc, u0, u1, o.sill, top, 0.05, glass, hash32(`${spec.input.seed}/${o.id}`) / 4294967296 + Math.round(spec.weathering.condition * 10));
       // A mullion and transom read as a window even from far away.
       if (!isDoor && o.width > 0.7) {
         rect(fc, o.u - 0.035, o.u + 0.035, o.sill, top, 0.06, frame);
