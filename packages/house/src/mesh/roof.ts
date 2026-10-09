@@ -150,7 +150,8 @@ function mansard(mb: MeshBuilder, p: RoofPartSpec, cresting: boolean): void {
   const upperEnds = e0 || e1 ? { x0: e0, x1: e1 } : undefined;
   // The curb moulding hides a small inset; without a curb (merged roofs, fire-wall ends) there is no inset.
   const curbDrawn = !p.merged && !e0 && !e1;
-  const ins = curbDrawn ? 0.12 : 0;
+  // The upper plate starts at the break (tucked 2 cm under the curb), so no slot opens below the seam.
+  const ins = curbDrawn ? -0.02 : 0;
   hip(mb, ix0 + (e0 ? 0 : ins), ix1 - (e1 ? 0 : ins), iz0 + ins, iz1 - ins, yt, p.pitch, upperEnds);
   if (!curbDrawn) {
     // Seam along the break between the steep and the shallow slope (merged roofs: only where visible).
