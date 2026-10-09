@@ -110,7 +110,8 @@ const SURFACE = /* glsl */ `
       // Peeling plaster: a few patches of bare grey render, mostly low on the wall.
       if ((uLookKind == 1 && brick < 0.5) || (uLookKind == 3 && h > 1.2)) {
         float pn = lookFbm(wp * 0.85 + 3.1) + 0.06 * (1.0 - smoothstep(0.8, 3.0, h));
-        float peel = smoothstep(0.735, 0.745, pn - 0.18 * wear + 0.12) * smoothstep(0.15, 0.4, wear);
+        // More wear → lower threshold → more patches (monotonic); fades in from nothing.
+        float peel = smoothstep(0.735, 0.745, pn + 0.13 * wear - 0.06) * smoothstep(0.05, 0.3, wear);
         // Plaster flakes off to grey render; stone erodes to a darker, rougher surface.
         vec3 under = uLookKind == 1 ? vec3(0.6, 0.57, 0.53) : c * vec3(0.78, 0.76, 0.72);
         c = mix(c, under * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * 0.85);
@@ -142,6 +143,11 @@ const SURFACE = /* glsl */ `
     // Moss sits in the lower lap of each tile, greener where water runs.
     float lap = 1.0 - smoothstep(0.0, 0.35, fract(v));
     c *= mix(vec3(1.0), vec3(0.9, 1.04, 0.82), rwear * lap * (0.4 + 0.6 * run) * fade);
+    // Dark slate cannot be darkened: there wear shows as a lift (dust, lime bloom, grey-green
+    // lichen), per tile and along the runs, weighted by how dark the surface is.
+    float dark = 1.0 - smoothstep(0.08, 0.35, dot(c, vec3(0.3, 0.59, 0.11)));
+    vec3 bloom = vec3(0.075, 0.08, 0.065) * (0.35 + 0.65 * r2) + vec3(0.02, 0.035, 0.0) * lap;
+    c += dark * rwear * bloom * (0.55 + 0.45 * smoothstep(0.35, 0.8, run)) * mix(1.0, 0.7, 1.0 - fade);
 #endif
   } else if (uLookKind == 5) {
 #ifndef LOOK_LITE
