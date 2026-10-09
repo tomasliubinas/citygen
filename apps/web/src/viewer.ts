@@ -129,7 +129,7 @@ export class HouseViewer {
       m.receiveShadow = true;
       this.house.add(m);
     }
-    setAge(this.materials.values(), spec.weathering.condition);
+    setAge(this.materials.values(), spec.weathering.condition, spec.weathering.strength);
     this.house.position.set(spec.placement.x, 0, spec.placement.z);
     this.house.rotation.y = spec.placement.rotationY;
     this.lastSpec = spec;

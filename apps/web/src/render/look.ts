@@ -21,6 +21,7 @@ varying vec3 vLookPos;
 varying vec3 vLookNormal;
 uniform int uLookKind;
 uniform float uLookAge;
+uniform float uLookSoft;
 float vLookRoofSpot = 0.0;
 float lookHash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float lookHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -110,12 +111,13 @@ const SURFACE = /* glsl */ `
       c *= 1.0 - 0.4 * damp;
       // Peeling plaster: a few patches of bare grey render, mostly low on the wall.
       if ((uLookKind == 1 && brick < 0.5) || (uLookKind == 3 && h > 1.2)) {
-        float pn = lookFbm(wp * 0.85 + 3.1) + 0.06 * (1.0 - smoothstep(0.8, 3.0, h));
+        // Softer styles: larger patches (lower frequency) at lower contrast.
+        float pn = lookFbm(wp * mix(0.4, 0.85, uLookSoft) + 3.1) + 0.06 * (1.0 - smoothstep(0.8, 3.0, h));
         // More wear → lower threshold → more patches (monotonic); fades in from nothing.
-        float peel = smoothstep(0.735, 0.745, pn + 0.13 * wear - 0.06) * smoothstep(0.05, 0.3, wear);
+        float peel = smoothstep(0.735, 0.745, pn + 0.13 * smoothstep(0.0, 0.9, uLookAge) - 0.06) * smoothstep(0.05, 0.3, uLookAge);
         // Plaster flakes off to grey render; stone erodes to a darker, rougher surface.
         vec3 under = uLookKind == 1 ? vec3(0.6, 0.57, 0.53) : c * vec3(0.78, 0.76, 0.72);
-        c = mix(c, under * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * 0.85);
+        c = mix(c, under * (0.9 + 0.2 * lookNoise(wp * 6.0)), peel * mix(0.4, 0.85, uLookSoft));
       }
     }
 #endif
@@ -185,9 +187,11 @@ export function enhanceMaterial(mat: THREE.MeshStandardMaterial, kind: SurfaceKi
   mat.userData.lookKind = kind;
   if (lite) mat.defines = { ...(mat.defines ?? {}), LOOK_LITE: '' };
   mat.userData.age = mat.userData.age ?? { value: 0.35 };
+  mat.userData.soft = mat.userData.soft ?? { value: 1 };
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uLookKind = { value: KIND[kind] };
     shader.uniforms.uLookAge = mat.userData.age;
+    shader.uniforms.uLookSoft = mat.userData.soft;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;')
       .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvLookNormal = normalize(mat3(modelMatrix) * objectNormal);')
@@ -334,8 +338,12 @@ export function createLook(
 }
 
 /** Set a house's wear on all of its enhanced materials. */
-export function setAge(mats: Iterable<THREE.Material>, age: number): void {
-  for (const m of mats) if (m.userData.age) m.userData.age.value = age;
+/** Wear level and the style's dirt strength (1 = default; lower = softer, larger patches). */
+export function setAge(mats: Iterable<THREE.Material>, age: number, strength = 1): void {
+  for (const m of mats) {
+    if (m.userData.age) m.userData.age.value = age;
+    if (m.userData.soft) m.userData.soft.value = strength;
+  }
 }
 
 /**

@@ -301,7 +301,8 @@ export interface HouseSpec {
   envelope: { width: number; depth: number };
   palette: Record<string, string>;
   /** Wear: 0 freshly built … 1 old and grimy (drives stains, dirt, lichen). */
-  weathering: { condition: number };
+  /** strength: spot (patch) prominence of the style — lower = larger, softer patches. */
+  weathering: { condition: number; strength: number };
   wallThickness: number;
   plinthHeight: number;
   floors: FloorSpec[];

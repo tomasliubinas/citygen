@@ -142,7 +142,7 @@ export interface StylePreset {
   windowHead: Weighted<'flat' | 'segmental'>;
   doorStyle: Weighted<DoorStyle>;
   glazing?: Weighted<'classic' | 'deco'>;
-  /** How strongly this style shows dirt (1 = default; bright white styles less). */
+  /** Spot prominence (1 = default; bright white styles: larger, softer patches). */
   weathering?: number;
   balconetPattern?: Weighted<BalconetPattern>;
   dormers: Weighted<'none' | 'alternate' | 'all'>;

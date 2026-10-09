@@ -1063,7 +1063,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     },
     // Central façades are the kept-up, restored ones; wear builds up towards the outskirts.
     // Location drives wear (outskirts worn, centre clean); the house's own age varies it by ±25%.
-    weathering: { condition: r3((input.wear ?? clamp((1 - input.centrality) * (0.75 + 0.5 * (g.age - 0.5)), 0, 1)) * (STYLES[g.style].weathering ?? 1)) },
+    weathering: { condition: r3(input.wear ?? clamp((1 - input.centrality) * (0.75 + 0.5 * (g.age - 0.5)), 0, 1)), strength: STYLES[g.style].weathering ?? 1 },
     wallThickness: WALL_THICKNESS,
     plinthHeight: r3(plinth),
     floors,
