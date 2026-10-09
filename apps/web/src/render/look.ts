@@ -398,14 +398,17 @@ export function glassMaterial(): THREE.MeshStandardMaterial {
         float curtain = step(1.0 - (0.18 + 0.5 * wwear), fract(wr * 3.7));
         float pick = floor(fract(wr * 13.1) * 5.0);
         // Ivories and faded, muted tones only (no reds/pinks).
-        vec3 mixed = pick < 1.0 ? vec3(0.9, 0.86, 0.76) : pick < 2.0 ? vec3(0.78, 0.74, 0.64) : pick < 3.0 ? vec3(0.62, 0.6, 0.55) : pick < 4.0 ? vec3(0.6, 0.64, 0.56) : vec3(0.6, 0.63, 0.66);
+        // Ivories plus a few colours, toned halfway down towards linen (subtle, not loud).
+        vec3 tone = pick < 1.0 ? vec3(0.62, 0.36, 0.3) : pick < 2.0 ? vec3(0.4, 0.5, 0.36) : pick < 3.0 ? vec3(0.86, 0.76, 0.5) : pick < 4.0 ? vec3(0.42, 0.48, 0.6) : vec3(0.9, 0.86, 0.76);
+        vec3 mixed = mix(vec3(0.84, 0.79, 0.68), tone, 0.5);
         vec3 cloth = mix(vec3(0.84, 0.79, 0.68), mixed, step(0.35, wwear * fract(wr * 5.9) * 2.0));
         // Seen through glass from outside, curtains read dim: barely visible on kept houses.
         inside = mix(inside, cloth * (0.3 + 0.25 * wwear), curtain * (0.3 + 0.35 * wwear));
         // Roller blinds at random heights on worn houses.
         float blindOn = step(1.0 - 0.35 * wwear, fract(wr * 9.7));
         float blindY = fract(vGlassPos.y / 3.9 + wr) ;
-        inside = mix(inside, vec3(0.72, 0.68, 0.6) * (0.35 + 0.25 * wwear), blindOn * step(0.35 + 0.5 * wr2, blindY));
+        // Soft blind edge and low contrast: no hard horizontal band.
+        inside = mix(inside, vec3(0.72, 0.68, 0.6) * (0.35 + 0.15 * wwear), blindOn * 0.6 * smoothstep(0.3 + 0.5 * wr2, 0.45 + 0.5 * wr2, blindY));
         // Dust film and, on derelict houses, the odd boarded-up pane.
         inside = mix(inside, vec3(0.42, 0.41, 0.38), 0.3 * wwear);
         float boarded = step(1.0 - 0.06 * wwear * wwear, fract(wr * 21.7));
@@ -421,7 +424,7 @@ export function glassMaterial(): THREE.MeshStandardMaterial {
         // Within the pane: brighter towards the top (sky).
         float hgt = vGlassPos.y;
         float top = smoothstep(-0.6, 0.9, fract(hgt / 3.8 + 0.15) - 0.5);
-        vec3 refl = skyR * fres * (0.45 + 0.35 * top);
+        vec3 refl = skyR * fres * (0.55 + 0.12 * top);
         totalEmissiveRadiance += refl * (1.0 - curtain * 0.5) * (1.0 - uNight) * (1.0 - 0.45 * wwear);
         float wlit = step(wr, uLit) * uNight * (1.0 - boarded);
         vec3 lamp = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.78, 0.5), wr2);
