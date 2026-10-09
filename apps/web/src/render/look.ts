@@ -176,7 +176,12 @@ if (uLookKind == 4) {
   float r = lookHash2(vec2(floor(u) + 31.0, row));
   float rw = smoothstep(0.2, 1.0, uLookAge);
   float run = lookNoise(vec3(along * 2.2, wp.y * 0.08, 7.0));
-  roughnessFactor = clamp(mix(0.38 + 0.12 * r, 0.65 + 0.3 * r, rw) - 0.12 * rw * smoothstep(0.5, 0.85, run), 0.2, 1.0);
+  // Wear spots made of whole tiles: a medium-scale cluster mask sampled per tile, so spots
+  // stay tile-sized. Spots go matte, the rest keeps its sheen, so they read on black slate.
+  float cl = lookNoise(vec3(floor(u) * 0.32, row * 0.11, 3.0));
+  float spot = smoothstep(0.62 - 0.22 * rw, 0.7 - 0.22 * rw, cl) * step(0.2, r + 0.3 * rw);
+  float base = mix(0.3 + 0.1 * r, 0.42 + 0.16 * r, rw);
+  roughnessFactor = clamp(mix(base, 0.95, spot * (0.4 + 0.6 * rw)) - 0.1 * rw * smoothstep(0.5, 0.85, run), 0.18, 1.0);
 }
 #endif
 `;
