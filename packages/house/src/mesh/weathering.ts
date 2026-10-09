@@ -116,41 +116,58 @@ function buildRust(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
   });
 }
 
-/** Old cable runs on the street façade: a line under the first string course, dropping down a corner. */
+/**
+ * Old cable runs below the first-floor moulding on any outside wall (not party walls),
+ * each in its own colour; more walls and more lines on more worn houses.
+ */
 function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
   const r = Rng.create(spec.input.seed, 'cables');
-  // Each house has its own wear level at which the cables appear (always by 0.65).
+  // Each house has its own wear level at which cables appear (always by 0.45).
   if (cond < r.range(0.12, 0.45)) return;
-  const fronts = spec.facades.filter((f) => f.side === 'front' && f.normal[1] > 0.5 && f.length > 6);
-  const fc = fronts.sort((p, q) => q.length - p.length)[0];
-  if (!fc) return;
-  const y = (spec.floors[1]?.elevation ?? spec.roof.eaveY - 0.9) - 0.32 - r.range(0, 0.15);
-  const out = 0.045;
-  const sag = (a: number, b: number, yy: number) => {
-    // Gently sagging between clips.
-    const n = Math.max(1, Math.round((b - a) / 1.6));
-    for (let k = 0; k < n; k++) {
-      const u0 = a + ((b - a) * k) / n;
-      const u1 = a + ((b - a) * (k + 1)) / n;
-      const um = (u0 + u1) / 2;
-      mb.beam([u0, yy, out], [um, yy - 0.025, out], 0.022, 0.022);
-      mb.beam([um, yy - 0.025, out], [u1, yy, out], 0.022, 0.022);
-      mb.box(u0 - 0.02, yy - 0.03, 0, u0 + 0.02, yy + 0.03, out + 0.01);
-    }
-  };
-  mb.with(facadeFrame(fc), () =>
-    mb.paint('metal', () => {
-      const fromLeft = r.chance(0.5);
-      const u0 = 0.35;
-      const u1 = fc.length - 0.35;
-      sag(u0, u1, y);
-      // Down-lead at one corner, and a junction box.
-      const ud = fromLeft ? u0 : u1;
-      mb.beam([ud, y, out], [ud, spec.plinthHeight + 0.3, out], 0.022, 0.022);
-      mb.box(ud - 0.14, spec.plinthHeight + 0.4, 0, ud + 0.14, spec.plinthHeight + 0.75, 0.09);
-      // More lines on more worn houses.
-      if (cond > 0.4 || r.chance(0.5)) sag(u0 + 0.6, u1 - 0.6, y - 0.09);
-      if (cond > 0.7) sag(u0 + 1.2, u1 - 1.2, y - 0.18);
-    }),
+  const halfW = spec.envelope.width / 2;
+  const pw = spec.input.partyWalls;
+  const walls = spec.facades.filter(
+    (f) => f.length > 5 && !(Math.abs(f.normal[0]) > 0.5 && ((pw.left && Math.abs(f.a[0] + halfW) < 1e-3) || (pw.right && Math.abs(f.a[0] - halfW) < 1e-3))),
   );
+  const colours = ['cableDark', 'cableDark', 'cableGrey', 'cableWhite', 'cableBrown'];
+  const base = (spec.floors[1]?.elevation ?? spec.roof.eaveY - 0.9) - 0.32;
+  const out = 0.045;
+  walls.forEach((fc, wi) => {
+    const rw = Rng.create(spec.input.seed, 'cables', fc.id);
+    // The street front always gets cables once they appear; other walls with rising odds.
+    const front = fc.side === 'front' && fc === walls.filter((f) => f.side === 'front').sort((p, q) => q.length - p.length)[0];
+    if (!front && !rw.chance(0.25 + 0.6 * cond)) return;
+    const lines = 1 + (cond > 0.4 ? 1 : 0) + (cond > 0.7 && rw.chance(0.5) ? 1 : 0);
+    mb.with(facadeFrame(fc), () => {
+      for (let k = 0; k < lines; k++) {
+        const y = base - k * 0.09 - rw.range(0, 0.12);
+        const u0 = 0.35 + k * 0.5;
+        const u1 = fc.length - 0.35 - k * 0.5;
+        if (u1 - u0 < 2) continue;
+        mb.paint(colours[(wi * 3 + k + rw.int(0, 4)) % colours.length], () => {
+          const n = Math.max(1, Math.round((u1 - u0) / 1.6));
+          for (let j = 0; j < n; j++) {
+            const a0 = u0 + ((u1 - u0) * j) / n;
+            const a1 = u0 + ((u1 - u0) * (j + 1)) / n;
+            const am = (a0 + a1) / 2;
+            mb.beam([a0, y, out], [am, y - 0.025, out], 0.022, 0.022);
+            mb.beam([am, y - 0.025, out], [a1, y, out], 0.022, 0.022);
+            mb.box(a0 - 0.02, y - 0.03, 0, a0 + 0.02, y + 0.03, out + 0.01);
+          }
+          // The first line drops down a corner to a junction box.
+          if (k === 0) {
+            const ud = rw.chance(0.5) ? u0 : u1;
+            mb.beam([ud, y, out], [ud, spec.plinthHeight + 0.3, out], 0.022, 0.022);
+          }
+        });
+        if (k === 0) {
+          mb.paint('metal', () => {
+            const ud = rw.chance(0.5) ? u0 : u1;
+            mb.box(ud - 0.14, spec.plinthHeight + 0.4, 0, ud + 0.14, spec.plinthHeight + 0.75, 0.09);
+          });
+        }
+      }
+    });
+  });
+  void r;
 }
