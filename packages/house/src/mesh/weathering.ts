@@ -22,6 +22,8 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
   const rustTop = spec.rusticatedGround ? e1 - 0.17 : -Infinity;
   const wallTop = spec.roof.eaveY - spec.roof.corniceHeight;
   const aTop = 0.6 * cond;
+  // Full-wall decals sit in front of rustication bands (0.035), never between them (flicker).
+  const zd = spec.rusticatedGround ? 0.055 : 0.02;
   const main = new Set(spec.facades);
   // Inside (reflex) corners of the footprint ring, at facade start (0) or end (1).
   const ring = spec.footprint;
@@ -50,7 +52,7 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
           const L = (0.35 + 1.15 * cond) * r.range(0.55, 1.15);
           const bottom = Math.max(top - L, spec.plinthHeight + 0.1);
           if (top - bottom < 0.15) continue;
-          const z = (o.sill < rustTop ? 0.035 : 0) + 0.012;
+          const z = (o.sill < rustTop ? 0.035 : 0) + 0.02;
           // A few soft drip streaks: alpha peaks on each streak's centre line and fades
           // to nothing at its sides and at its foot.
           const streaks = 3 + Math.floor(r.next() * 3);
@@ -69,7 +71,7 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
           const gy = spec.plinthHeight;
           const gh = 0.6 + 1.4 * cond;
           const ga = 0.7 * cond;
-          mb.quadAlpha([0, gy, 0.013], [fc.length, gy, 0.013], [fc.length, gy + gh, 0.013], [0, gy + gh, 0.013], [ga, ga, 0, 0]);
+          mb.quadAlpha([0, gy, zd], [fc.length, gy, zd], [fc.length, gy + gh, zd], [0, gy + gh, zd], [ga, ga, 0, 0]);
         }
         // Grime collecting in inside corners (where two walls meet), full height.
         const wallH = wallTop - spec.plinthHeight;
@@ -80,7 +82,7 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
           const u1 = end === 0 ? 0.9 : fc.length;
           const aL = end === 0 ? ca : 0;
           const aR = end === 0 ? 0 : ca;
-          mb.quadAlpha([u0, spec.plinthHeight, 0.013], [u1, spec.plinthHeight, 0.013], [u1, spec.plinthHeight + wallH, 0.013], [u0, spec.plinthHeight + wallH, 0.013], [aL, aR, aR * 0.4, aL * 0.4]);
+          mb.quadAlpha([u0, spec.plinthHeight, zd], [u1, spec.plinthHeight, zd], [u1, spec.plinthHeight + wallH, zd], [u0, spec.plinthHeight + wallH, zd], [aL, aR, aR * 0.4, aL * 0.4]);
         }
         // Soot and run-off under the cornice of the main body.
         if (main.has(fc) && fc.length > 1.2) {

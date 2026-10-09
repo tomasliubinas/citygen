@@ -142,6 +142,8 @@ export interface StylePreset {
   windowHead: Weighted<'flat' | 'segmental'>;
   doorStyle: Weighted<DoorStyle>;
   glazing?: Weighted<'classic' | 'deco'>;
+  /** How strongly this style shows dirt (1 = default; bright white styles less). */
+  weathering?: number;
   balconetPattern?: Weighted<BalconetPattern>;
   dormers: Weighted<'none' | 'alternate' | 'all'>;
   chance: {
@@ -296,6 +298,7 @@ export const BEAUX_ARTS: StylePreset = {
 export const ART_NOUVEAU: StylePreset = {
   id: 'art-nouveau',
   label: 'Art Nouveau villa (1895–1914)',
+  weathering: 0.55,
   bayWidth: [3.0, 3.6],
   plinthHeight: [0.7, 1.0],
   floorHeights: { ground: [3.8, 4.2], main: [4.0, 4.4], upper: [3.5, 3.8], top: [3.2, 3.4] },
