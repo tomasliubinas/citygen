@@ -354,7 +354,9 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     if (!centralPavilion && comp !== 'gate-tower' && g.gableShape !== 'none') pediments.push(makePediment('p-risalit', cx0, cx1, zRis, co, g.oculus && comp === 'risalit'));
     if (nFloors >= 2 && g.oriel !== 'center' && g.doorStyle === 'classical' && comp !== 'gate-tower') {
       balconies.push({
-        id: 'b-center', floor: 1, side: 'front', x0: -centerHalf, x1: centerHalf,
+        // Either over the door bay only, or across the whole front of the risalit.
+        id: 'b-center', floor: 1, side: 'front',
+        ...(g.risalitBalcony && comp === 'risalit' ? { x0: cx0 + 0.04, x1: cx1 - 0.04 } : { x0: -centerHalf, x1: centerHalf }),
         zFace: zRis, depth: comp === 'risalit' ? 1.05 : 0.9, y: e1, support: 'consoles', railing: g.balustrade,
       });
     }

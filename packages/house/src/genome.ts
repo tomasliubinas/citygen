@@ -91,6 +91,8 @@ export interface ManorGenome {
   groundCladding: boolean;
   /** Whole façade in scored limestone blocks instead of plaster. */
   ashlar: boolean;
+  /** Main-floor balcony spanning the whole risalit front (vs. the door bay only). */
+  risalitBalcony: boolean;
   /** Glazed-tile frieze under the eaves. */
   accentFrieze: boolean;
   endWings: boolean;
@@ -171,6 +173,7 @@ export interface StylePreset {
     fluting?: number;
     groundCladding?: number;
     ashlar?: number;
+    risalitBalcony?: number;
   };
   colors: { wall: Weighted<string>; roof: Weighted<string>; frame: Weighted<string>; door: Weighted<string>; accent: Weighted<string>; trim?: Weighted<string>; stone?: Weighted<string> };
 }
@@ -619,6 +622,7 @@ export function createGenome(seed: string, styleId: StyleId = 'classicist-manor'
     fluting: r('fluting').chance(p.chance.fluting ?? 0),
     groundCladding: r('ground-cladding').chance(p.chance.groundCladding ?? 0),
     ashlar: r('ashlar').chance(p.chance.ashlar ?? 0),
+    risalitBalcony: r('risalit-balcony').chance(p.chance.risalitBalcony ?? 0.45),
     courtyard: r('courtyard').chance(0.5) ? 'closed' : 'open',
     roofPitch: range('roof-pitch', p.roofPitch),
     pedimentPitch: range('pediment-pitch', p.pedimentPitch),
