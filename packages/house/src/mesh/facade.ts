@@ -641,7 +641,8 @@ function basementWindows(mb: MeshBuilder, spec: HouseSpec, fc: FacadeSpec): void
     const w = Math.min(0.75, o.width * 0.6);
     const y0 = ph * 0.28;
     const y1 = ph * 0.72;
-    mb.paint('glass', () => mb.box(o.u - w / 2, y0, 0.0, o.u + w / 2, y1, 0.1));
+    // Cellar opening: a dark void behind the bars, not reflective glass.
+    mb.paint('void', () => mb.box(o.u - w / 2, y0, 0.0, o.u + w / 2, y1, 0.1));
     mb.paint('metal', () => {
       for (let k = 1; k < 4; k++) {
         const x2 = o.u - w / 2 + (w * k) / 4;

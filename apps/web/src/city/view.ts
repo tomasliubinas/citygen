@@ -16,6 +16,7 @@ const LOOK: Record<string, { roughness: number; metalness: number; side?: THREE.
   metal: { roughness: 0.45, metalness: 0.6 },
   roofTrim: { roughness: 0.5, metalness: 0.35 },
   accent: { roughness: 0.3, metalness: 0.1 },
+  void: { roughness: 1, metalness: 0 },
 };
 
 const SLICE_MS = 10;

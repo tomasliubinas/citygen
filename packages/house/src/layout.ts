@@ -1054,6 +1054,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       roofTrim: '#61666d',
       stain: '#463e33',
       rust: '#7a4528',
+      void: '#0d0e0f',
       cableDark: '#1b1c1e',
       cableGrey: '#77787a',
       cableWhite: '#d8d5cd',
