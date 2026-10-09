@@ -127,19 +127,18 @@ const SURFACE = /* glsl */ `
     c *= mix(1.0, 0.8 + 0.2 * smoothstep(0.0, 0.3, fract(v)), fade);
     c *= 1.0 - 0.18 * lookLine(u, 0.02) * fade;
 #ifndef LOOK_LITE
-    float lichen = smoothstep(0.66 - 0.12 * uLookAge, 0.85, lookFbm(wp * 0.5));
-    c = mix(c, mix(c, vec3(0.34, 0.38, 0.22), 0.5), lichen * smoothstep(0.3, 1.0, uLookAge) * 0.6);
-    // Patchy repairs: a few replaced tiles in a fresher tone.
-    // Roofs weather later and more gently than walls.
-    float rwear = smoothstep(0.35, 1.0, uLookAge) * 0.7;
-    float rep = step(1.0 - 0.1 * rwear, lookHash2(vec2(floor(u) + 17.0, row)));
-    c = mix(c, c * vec3(1.14, 1.06, 0.96), rep * fade);
-    // Re-roofed areas: whole patches of newer slates/tiles in a different tone, and weathered dark patches.
-    float pa = lookFbm(wp * 0.33 + 5.0);
-    float lumR = dot(c, vec3(0.3, 0.59, 0.11));
-    // Mix towards real colours so patches also show on dark slate.
-    c = mix(c, vec3(lumR) * 1.6 + vec3(0.05), smoothstep(0.6, 0.64, pa) * rwear * 0.75);
-    c = mix(c, vec3(0.2, 0.17, 0.13), smoothstep(0.38, 0.33, pa) * rwear * 0.6);
+    // Roof wear (cheap: one hash + one stretched noise), always multiplied onto the clean tiles.
+    float rwear = smoothstep(0.35, 1.0, uLookAge);
+    // Individual tiles: some darker / weathered, a few replaced in a fresher tone.
+    float r2 = lookHash2(vec2(floor(u) + 17.0, row));
+    c *= mix(1.0, 0.82 + 0.18 * r2, rwear * fade);
+    c *= mix(1.0, 1.1, step(0.96, r2) * rwear * fade);
+    // Rain washes straight down the slope: thin vertical runs, darker towards the eaves.
+    float run = lookNoise(vec3(along * 2.2, h * 0.08, 7.0));
+    c *= 1.0 - rwear * 0.22 * smoothstep(0.45, 0.85, run);
+    // Moss sits in the lower lap of each tile, greener where water runs.
+    float lap = 1.0 - smoothstep(0.0, 0.35, fract(v));
+    c *= mix(vec3(1.0), vec3(0.9, 1.04, 0.82), rwear * lap * (0.4 + 0.6 * run) * fade);
 #endif
   } else if (uLookKind == 5) {
 #ifndef LOOK_LITE
