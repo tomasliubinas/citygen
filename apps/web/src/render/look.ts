@@ -21,6 +21,7 @@ varying vec3 vLookPos;
 varying vec3 vLookNormal;
 uniform int uLookKind;
 uniform float uLookAge;
+float vLookRoofSpot = 0.0;
 float lookHash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float lookHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float lookNoise(vec3 x) {
@@ -131,23 +132,16 @@ const SURFACE = /* glsl */ `
     c *= mix(1.0, 0.8 + 0.2 * smoothstep(0.0, 0.3, fract(v)), fade);
     c *= 1.0 - 0.18 * lookLine(u, 0.02) * fade;
 #ifndef LOOK_LITE
-    // Roof wear (cheap: one hash + one stretched noise), always multiplied onto the clean tiles.
+    // Roof wear: ONE spot field (worn tiles + runs washed down the slope), applied as a colour
+    // multiply here and as matte roughness in ROUGH — so it reads on red tile and black slate alike.
     float rwear = smoothstep(0.35, 1.0, uLookAge);
-    // Individual tiles: some darker / weathered, a few replaced in a fresher tone.
     float r2 = lookHash2(vec2(floor(u) + 17.0, row));
-    c *= mix(1.0, 0.82 + 0.18 * r2, rwear * fade);
-    c *= mix(1.0, 1.1, step(0.96, r2) * rwear * fade);
-    // Rain washes straight down the slope: thin vertical runs, darker towards the eaves.
     float run = lookNoise(vec3(along * 2.2, h * 0.08, 7.0));
-    c *= 1.0 - rwear * 0.22 * smoothstep(0.45, 0.85, run);
-    // Moss sits in the lower lap of each tile, greener where water runs.
-    float lap = 1.0 - smoothstep(0.0, 0.35, fract(v));
-    c *= mix(vec3(1.0), vec3(0.9, 1.04, 0.82), rwear * lap * (0.4 + 0.6 * run) * fade);
-    // Dark slate cannot be darkened: there wear shows as a lift (dust, lime bloom, grey-green
-    // lichen), per tile and along the runs, weighted by how dark the surface is.
-    float dark = 1.0 - smoothstep(0.08, 0.35, dot(c, vec3(0.3, 0.59, 0.11)));
-    vec3 bloom = vec3(0.075, 0.08, 0.065) * (0.35 + 0.65 * r2) + vec3(0.02, 0.035, 0.0) * lap;
-    c += dark * rwear * bloom * 0.45 * (0.55 + 0.45 * smoothstep(0.35, 0.8, run)) * mix(1.0, 0.7, 1.0 - fade);
+    float rspot = clamp(smoothstep(0.45, 0.85, run) * 0.8 + (1.0 - r2) * 0.45, 0.0, 1.0) * rwear;
+    c *= 1.0 - 0.22 * rspot * fade;
+    // A few replaced tiles in a fresher tone.
+    c *= mix(1.0, 1.1, step(0.96, r2) * rwear * fade);
+    vLookRoofSpot = rspot;
 #endif
   } else if (uLookKind == 5) {
 #ifndef LOOK_LITE
@@ -164,24 +158,9 @@ const SURFACE = /* glsl */ `
 const ROUGH = /* glsl */ `
 #ifndef LOOK_LITE
 if (uLookKind == 4) {
-  // Slate sheen: new tiles are smooth and catch the sky; worn ones go matte, tile by tile,
-  // and the rain runs stay a little glossier.
-  vec3 wp = vLookPos;
-  vec3 wn = normalize(vLookNormal);
-  vec2 tng = length(wn.xz) > 1e-3 ? normalize(vec2(-wn.z, wn.x)) : vec2(1.0, 0.0);
-  float along = dot(wp.xz, tng);
-  float v = wp.y / 0.115;
-  float row = floor(v);
-  float u = along / 0.32 + mod(row, 2.0) * 0.5;
-  float r = lookHash2(vec2(floor(u) + 31.0, row));
-  float rw = smoothstep(0.2, 1.0, uLookAge);
-  float run = lookNoise(vec3(along * 2.2, wp.y * 0.08, 7.0));
-  // Wear spots made of whole tiles: a medium-scale cluster mask sampled per tile, so spots
-  // stay tile-sized. Spots go matte, the rest keeps its sheen, so they read on black slate.
-  float cl = lookNoise(vec3(floor(u) * 0.32, row * 0.11, 3.0));
-  float spot = smoothstep(0.62 - 0.22 * rw, 0.7 - 0.22 * rw, cl) * step(0.2, r + 0.3 * rw);
-  float base = mix(0.3 + 0.1 * r, 0.42 + 0.16 * r, rw);
-  roughnessFactor = clamp(mix(base, 0.95, spot * (0.4 + 0.6 * rw)) - 0.1 * rw * smoothstep(0.5, 0.85, run), 0.18, 1.0);
+  // Same spot field as the colour: new roof smooth with a sheen, spots go matte.
+  float base = mix(0.32, 0.45, smoothstep(0.2, 1.0, uLookAge));
+  roughnessFactor = clamp(mix(base, 0.95, vLookRoofSpot), 0.18, 1.0);
 }
 #endif
 `;
