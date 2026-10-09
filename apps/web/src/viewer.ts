@@ -12,7 +12,7 @@ const LOOK: Record<string, { roughness: number; metalness: number; side?: THREE.
   wall: { roughness: 0.93, metalness: 0 },
   trim: { roughness: 0.86, metalness: 0 },
   stone: { roughness: 0.95, metalness: 0 },
-  roof: { roughness: 0.62, metalness: 0.15, side: THREE.DoubleSide },
+  roof: { roughness: 0.62, metalness: 0.05, side: THREE.DoubleSide },
   glass: { roughness: 0.04, metalness: 0.6 },
   frame: { roughness: 0.55, metalness: 0 },
   door: { roughness: 0.55, metalness: 0 },

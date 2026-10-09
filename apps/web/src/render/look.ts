@@ -147,7 +147,7 @@ const SURFACE = /* glsl */ `
     // lichen), per tile and along the runs, weighted by how dark the surface is.
     float dark = 1.0 - smoothstep(0.08, 0.35, dot(c, vec3(0.3, 0.59, 0.11)));
     vec3 bloom = vec3(0.075, 0.08, 0.065) * (0.35 + 0.65 * r2) + vec3(0.02, 0.035, 0.0) * lap;
-    c += dark * rwear * bloom * (0.55 + 0.45 * smoothstep(0.35, 0.8, run)) * mix(1.0, 0.7, 1.0 - fade);
+    c += dark * rwear * bloom * 0.45 * (0.55 + 0.45 * smoothstep(0.35, 0.8, run)) * mix(1.0, 0.7, 1.0 - fade);
 #endif
   } else if (uLookKind == 5) {
 #ifndef LOOK_LITE
@@ -158,6 +158,27 @@ const SURFACE = /* glsl */ `
   }
   diffuseColor.rgb = c;
 }
+`;
+
+
+const ROUGH = /* glsl */ `
+#ifndef LOOK_LITE
+if (uLookKind == 4) {
+  // Slate sheen: new tiles are smooth and catch the sky; worn ones go matte, tile by tile,
+  // and the rain runs stay a little glossier.
+  vec3 wp = vLookPos;
+  vec3 wn = normalize(vLookNormal);
+  vec2 tng = length(wn.xz) > 1e-3 ? normalize(vec2(-wn.z, wn.x)) : vec2(1.0, 0.0);
+  float along = dot(wp.xz, tng);
+  float v = wp.y / 0.115;
+  float row = floor(v);
+  float u = along / 0.32 + mod(row, 2.0) * 0.5;
+  float r = lookHash2(vec2(floor(u) + 31.0, row));
+  float rw = smoothstep(0.2, 1.0, uLookAge);
+  float run = lookNoise(vec3(along * 2.2, wp.y * 0.08, 7.0));
+  roughnessFactor = clamp(mix(0.38 + 0.12 * r, 0.65 + 0.3 * r, rw) - 0.12 * rw * smoothstep(0.5, 0.85, run), 0.2, 1.0);
+}
+#endif
 `;
 
 const BUMP = /* glsl */ `
@@ -190,7 +211,8 @@ export function enhanceMaterial(mat: THREE.MeshStandardMaterial, kind: SurfaceKi
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${SURFACE}`)
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${BUMP}`);
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n${BUMP}`)
+      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>\n${ROUGH}`);
   };
   mat.customProgramCacheKey = () => `look-${kind}${lite ? '-lite' : ''}`;
   mat.needsUpdate = true;
