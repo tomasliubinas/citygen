@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { addNavToggle } from './render/nav';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from './render/look';
 import type { InteriorSpec } from '@citygen/interior';
@@ -89,6 +90,7 @@ export class HouseViewer {
     this.controls.maxPolarAngle = Math.PI * 0.495;
     this.controls.minDistance = 6;
     this.controls.maxDistance = 400;
+    addNavToggle(container, this.controls as never);
 
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();

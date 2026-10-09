@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
+import { addNavToggle } from '../render/nav';
 import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from '../render/look';
 import type { CitySpec, PlotSpec } from '@citygen/city';
 import { buildHouseMesh, generateHouse, type HouseSpec } from '@citygen/house';
@@ -103,6 +104,7 @@ export class CityView {
     // Same mouse scheme as the house page: left = rotate, right (or Shift/Ctrl + left) = pan.
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    addNavToggle(container, this.controls as never);
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI * 0.47;
     this.controls.minDistance = 15;

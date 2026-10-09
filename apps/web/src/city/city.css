@@ -77,3 +77,8 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
   .panel { border-right: 0; border-bottom: 1px solid var(--line); }
   .minimap { width: 120px; height: 120px; }
 }
+
+.nav-toggle { position: absolute; left: 12px; bottom: 12px; z-index: 4; display: flex; background: var(--panel, #fbfaf8); border: 1px solid var(--line, #e2dfd8); border-radius: 7px; overflow: hidden; box-shadow: 0 1px 6px rgba(0,0,0,0.08); }
+.nav-toggle button { border: 0; border-radius: 0; background: transparent; padding: 6px 9px; color: var(--ink, #26282b); display: grid; place-items: center; cursor: pointer; }
+.nav-toggle button + button { border-left: 1px solid var(--line, #e2dfd8); }
+.nav-toggle button.on { background: var(--accent, #3a3d42); color: #fff; }
