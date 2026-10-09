@@ -322,6 +322,8 @@ export interface HouseSpec {
   /** 'block' = single body; 'u' = side wings around an open court; 'o' = closed courtyard. */
   plan: 'block' | 'u' | 'o';
   wings: WingBlockSpec[];
+  /** Plot area behind the building left as garden (deep plots), building-local. */
+  garden: { x0: number; x1: number; z0: number; z1: number } | null;
   facades: FacadeSpec[];
   pediments: PedimentSpec[];
   portico: PorticoSpec | null;

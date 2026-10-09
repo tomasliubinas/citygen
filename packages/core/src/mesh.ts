@@ -21,6 +21,8 @@ export interface MeshBuffers {
   indices: Uint32Array;
   /** Optional per-vertex opacity (decals such as stains); absent = fully opaque. */
   alpha?: Float32Array;
+  /** Per-vertex surface coordinates (along the façade from its corner, height), for patterns that must move with the wall. */
+  facadeUv?: Float32Array;
 }
 export type MeshData = Record<string, MeshBuffers>;
 
@@ -30,6 +32,7 @@ class Part {
   idx: number[] = [];
   alpha: number[] = [];
   hasAlpha = false;
+  uv: number[] = [];
 }
 
 const EPS = 1e-9;
@@ -46,6 +49,20 @@ export class MeshBuilder {
   material = 'default';
   /** When set, emitted vertices carry this scalar in `alpha` (e.g. a per-window random id for glass). */
   value: number | null = null;
+  private uvFrame: Mat | null = null;
+
+  /** Like with(), and vertices inside get façade coordinates (x along the wall from its start, y up). */
+  facade(local: Mat, fn: () => void): void {
+    this.with(local, () => {
+      const prev = this.uvFrame;
+      this.uvFrame = this.m;
+      try {
+        fn();
+      } finally {
+        this.uvFrame = prev;
+      }
+    });
+  }
 
   /** Run `fn` with an extra local transform applied. */
   with(local: Mat, fn: () => void): void {
@@ -91,6 +108,13 @@ export class MeshBuilder {
       part.pos.push(p[0], p[1], p[2]);
       part.nor.push(n[0], n[1], n[2]);
       part.alpha.push(alphas ? alphas[i] : (this.value ?? 1));
+      const f = this.uvFrame;
+      if (f) {
+        const dx = p[0] - f[9];
+        const dy = p[1] - f[10];
+        const dz = p[2] - f[11];
+        part.uv.push(dx * f[0] + dy * f[1] + dz * f[2], dx * f[3] + dy * f[4] + dz * f[5]);
+      } else part.uv.push(p[0] + p[2], p[1]);
     }
     for (let i = 0; i < triangles.length; i += 3) {
       if (this.mirrored) part.idx.push(base + triangles[i], base + triangles[i + 2], base + triangles[i + 1]);
@@ -283,6 +307,7 @@ export class MeshBuilder {
         normals: new Float32Array(p.nor),
         indices: new Uint32Array(p.idx),
         ...(p.hasAlpha ? { alpha: new Float32Array(p.alpha) } : {}),
+        facadeUv: new Float32Array(p.uv),
       };
     }
     return out;

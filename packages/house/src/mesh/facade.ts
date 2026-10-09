@@ -108,7 +108,7 @@ export function buildFacades(mb: MeshBuilder, spec: HouseSpec): void {
     const prev = inRing ? spec.facades[(i - 1 + nRing) % nRing] : undefined;
     const next = inRing ? spec.facades[(i + 1) % nRing] : undefined;
     const cx = { start: conv[i].start && !isParty(prev), end: conv[i].end && !isParty(next) };
-    mb.with(facadeFrame(fc), () => {
+    mb.facade(facadeFrame(fc), () => {
       // Ashlar façades: the wall itself is stone (scored limestone blocks in the shader).
       mb.paint(spec.genome.ashlar ? 'stone' : 'wall', () => {
         for (const r of cutRects(0, fc.length, 0, wallTop + (isParty(fc) ? spec.roof.corniceHeight - 0.05 : 0), holes)) mb.box(r.u0, r.v0, -t, r.u1, r.v1, 0);
@@ -613,7 +613,7 @@ export function buildSimpleFacade(mb: MeshBuilder, spec: HouseSpec, fc: FacadeSp
   glassSeed = spec.input.seed;
   glassWear = spec.weathering.condition;
   const holes = fc.openings.map(holeOf);
-  mb.with(facadeFrame(fc), () => {
+  mb.facade(facadeFrame(fc), () => {
     mb.paint('wall', () => {
       for (const r of cutRects(0, fc.length, y0, y1, holes)) mb.box(r.u0, r.v0, -thickness, r.u1, r.v1, 0);
     });

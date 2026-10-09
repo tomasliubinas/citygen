@@ -19,6 +19,7 @@ const KIND: Record<SurfaceKind, number> = { none: 0, plaster: 1, trim: 2, stone:
 const NOISE = /* glsl */ `
 varying vec3 vLookPos;
 varying vec3 vLookNormal;
+varying vec2 vLookUv;
 uniform int uLookKind;
 uniform float uLookAge;
 uniform float uLookSoft;
@@ -51,6 +52,9 @@ const SURFACE = /* glsl */ `
   vec3 c = diffuseColor.rgb;
   float h = wp.y;
   if (uLookKind == 1 || uLookKind == 2 || uLookKind == 3) {
+    // Wall patterns live in façade coordinates (from the wall's corner), so they move with the wall.
+    along = vLookUv.x;
+    wp = vec3(vLookUv.x, h, wn.x * 3.1 + wn.z * 7.3);
     float brick = uLookKind == 1 ? smoothstep(0.08, 0.18, c.r - c.b) * step(c.g, 0.55) : 0.0;
     if (brick > 0.5 && abs(wn.y) < 0.5) {
       // Gothic brick: running bond, lighter mortar, uneven firing (anti-aliased, fades with distance).
@@ -197,9 +201,9 @@ export function enhanceMaterial(mat: THREE.MeshStandardMaterial, kind: SurfaceKi
     shader.uniforms.uLookAge = mat.userData.age;
     shader.uniforms.uLookSoft = mat.userData.soft;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;\nvarying vec2 vLookUv;\nattribute vec2 aFacade;')
       .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvLookNormal = normalize(mat3(modelMatrix) * objectNormal);')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLookPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLookPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvLookUv = aFacade;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${NOISE}`)
       .replace('#include <color_fragment>', `#include <color_fragment>\n${SURFACE}`)
@@ -354,11 +358,12 @@ export function setAge(mats: Iterable<THREE.Material>, age: number, strength = 1
  * Geometry for a MeshBuffers part. The per-vertex scalar means opacity for
  * 'stain' decals (→ RGBA colour) and a per-window random id for 'glass' (→ aWin).
  */
-export function geometryFor(buf: { positions: Float32Array; normals: Float32Array; indices: Uint32Array; alpha?: Float32Array }, slot = ''): THREE.BufferGeometry {
+export function geometryFor(buf: { positions: Float32Array; normals: Float32Array; indices: Uint32Array; alpha?: Float32Array; facadeUv?: Float32Array }, slot = ''): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(buf.positions, 3));
   g.setAttribute('normal', new THREE.BufferAttribute(buf.normals, 3));
   g.setIndex(new THREE.BufferAttribute(buf.indices, 1));
+  if (buf.facadeUv) g.setAttribute('aFacade', new THREE.BufferAttribute(buf.facadeUv, 2));
   if (slot === 'glass') {
     g.setAttribute('aWin', new THREE.BufferAttribute(buf.alpha ?? new Float32Array(buf.positions.length / 3).fill(0.5), 1));
   } else if (buf.alpha && (slot === 'stain' || slot === 'rust')) {

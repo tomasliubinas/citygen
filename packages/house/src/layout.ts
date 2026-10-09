@@ -1075,6 +1075,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     masses,
     footprint: fp,
     courtyard: court,
+    garden: plan === 'block' && avail > Dm + 1 ? { x0: r3(-W / 2), x1: r3(W / 2), z0: r3(-D / 2), z1: r3(zBack - GARDEN_TERRACE - 0.3) } : null,
     plan,
     wings,
     facades,

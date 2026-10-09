@@ -134,6 +134,7 @@ export class HouseViewer {
     setAge(this.materials.values(), spec.weathering.condition, spec.weathering.strength);
     this.house.position.set(spec.placement.x, 0, spec.placement.z);
     this.house.rotation.y = spec.placement.rotationY;
+    this.buildGarden(spec);
     this.lastSpec = spec;
 
     this.placeSun(spec);
@@ -358,6 +359,55 @@ export class HouseViewer {
     });
     const result = await new GLTFExporter().parseAsync(out, { binary: true });
     return result as ArrayBuffer;
+  }
+
+  /** Garden on the part of a deep plot behind the building: lawn, hedge border, path, trees. */
+  private garden = new THREE.Group();
+  private buildGarden(spec: HouseSpec): void {
+    disposeChildren(this.garden);
+    if (!this.garden.parent) this.scene.add(this.garden);
+    const g = spec.garden;
+    if (!g || g.z1 - g.z0 < 3) return;
+    const w = g.x1 - g.x0;
+    const d = g.z1 - g.z0;
+    const lawn = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.4, d - 0.4).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#8fa274', roughness: 1 }));
+    lawn.position.set((g.x0 + g.x1) / 2, 0.025, (g.z0 + g.z1) / 2);
+    lawn.receiveShadow = true;
+    const hedgeMat = new THREE.MeshStandardMaterial({ color: '#4f6a3e', roughness: 1 });
+    const hedge = (x0: number, x1: number, z0: number, z1: number) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 1.1, z1 - z0), hedgeMat);
+      m.position.set((x0 + x1) / 2, 0.55, (z0 + z1) / 2);
+      m.castShadow = m.receiveShadow = true;
+      this.garden.add(m);
+    };
+    hedge(g.x0, g.x1, g.z0, g.z0 + 0.6);
+    hedge(g.x0, g.x0 + 0.6, g.z0, g.z1);
+    hedge(g.x1 - 0.6, g.x1, g.z0, g.z1);
+    const path = new THREE.Mesh(new THREE.PlaneGeometry(1.4, d - 0.6).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#cfc6b3', roughness: 1 }));
+    path.position.set(0, 0.035, (g.z0 + g.z1) / 2 + 0.3);
+    path.receiveShadow = true;
+    this.garden.add(lawn, path);
+    // A few trees, seeded so the same plot keeps the same garden.
+    let seed = 0;
+    for (const ch of spec.input.seed) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const crownMat = new THREE.MeshStandardMaterial({ color: '#5f7a4a', roughness: 1 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: '#5a4636', roughness: 1 });
+    const count = Math.min(12, Math.floor((w * d) / 90));
+    for (let i = 0; i < count; i++) {
+      const x = g.x0 + 2 + rnd() * (w - 4);
+      if (Math.abs(x) < 2) continue;
+      const z = g.z0 + 2 + rnd() * (d - 4);
+      const sc = 0.8 + rnd() * 0.6;
+      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.6 * sc, 1), crownMat);
+      crown.position.set(x, 3.6 * sc + 1.2, z);
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 3.4 * sc, 6), trunkMat);
+      trunk.position.set(x, 1.7 * sc, z);
+      crown.castShadow = trunk.castShadow = true;
+      this.garden.add(crown, trunk);
+    }
+    this.garden.position.set(spec.placement.x, 0, spec.placement.z);
+    this.garden.rotation.y = spec.placement.rotationY;
   }
 }
 
