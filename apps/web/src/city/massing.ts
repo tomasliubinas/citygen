@@ -32,7 +32,7 @@ export function buildMassing(spec: HouseSpec): { walls: THREE.BufferGeometry; ro
   const facades = [...spec.facades, ...(spec.towers ?? []).flatMap((t) => t.facades)];
   const win = windowPanes(facades, spec);
   return {
-    walls: concatColored([paint(merge(wallParts), spec.palette.wall ?? '#f2efe8'), win.frames]),
+    walls: concatColored([paint(merge(wallParts), worn(spec.palette.wall ?? '#f2efe8', spec.weathering.condition)), win.frames]),
     roofs: paint(merge(roofParts), spec.palette.roof ?? '#3a3d42'),
     glass: win.glass,
   };
@@ -209,4 +209,14 @@ function paint(g: THREE.BufferGeometry, hex: string): THREE.BufferGeometry {
   for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return g;
+}
+
+/** Far-view wear baked into the colour: faded towards warm grey and slightly darker. */
+function worn(hex: string, cond: number): string {
+  const c = new THREE.Color(hex);
+  const w = Math.min(1, cond / 0.9);
+  const l = c.r * 0.299 + c.g * 0.587 + c.b * 0.114;
+  const k = 1 - 0.12 * w;
+  c.setRGB((c.r + (l * 0.97 - c.r) * 0.55 * w) * k, (c.g + (l * 0.95 - c.g) * 0.55 * w) * k, (c.b + (l * 0.9 - c.b) * 0.55 * w) * k);
+  return '#' + c.getHexString();
 }

@@ -55,7 +55,8 @@ export class CityView {
   private queue: number[] = [];
   private building = false;
   private materials = new Map<string, THREE.MeshStandardMaterial>();
-  private massingMat = enhanceMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 'plaster', true);
+  // Massing wear is baked into its vertex colours, so the shader's cheap wear stays off (age 0).
+  private massingMat = (() => { const m = enhanceMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }), 'plaster', true); setAge([m], 0); return m; })();
   private massingRoofMat = enhanceMaterial(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.65, metalness: 0.1, side: THREE.DoubleSide }), 'roof', true);
   private look!: Look;
   private decals = new Map<string, THREE.MeshStandardMaterial>();
@@ -409,7 +410,7 @@ export class CityView {
         if (!(o instanceof THREE.Mesh) || !o.userData.slot) return;
         if (o.userData.slot === 'stain' || o.userData.slot === 'rust') o.visible = full;
         else if (o.userData.slot === 'glass') return;
-        else o.material = this.material(o.userData.slot, o.userData.color, full ? o.userData.age : null, o.userData.soft);
+        else o.material = this.material(o.userData.slot, o.userData.color, o.userData.age, full, o.userData.soft);
       });
     }
   }
@@ -447,7 +448,7 @@ export class CityView {
     for (const [slot, buf] of Object.entries(mesh)) {
       const geo = geometryFor(buf, slot);
       const color = spec.palette[slot] ?? '#cccccc';
-      const mat = slot === 'stain' || slot === 'rust' ? this.decal(slot, spec.palette[slot] ?? '#463e33') : slot === 'glass' ? this.glass : this.material(slot, color);
+      const mat = slot === 'stain' || slot === 'rust' ? this.decal(slot, spec.palette[slot] ?? '#463e33') : slot === 'glass' ? this.glass : this.material(slot, color, age);
       const m = new THREE.Mesh(geo, mat);
       m.userData = { slot, color, age, soft: spec.weathering.strength };
       if (slot === 'stain' || slot === 'rust') m.visible = false;
@@ -462,18 +463,19 @@ export class CityView {
   }
 
   /** Lite materials are shared per colour; full ones (close houses) also per wear bucket. */
-  private material(slot: string, color: string, age: number | null = null, soft = 1): THREE.MeshStandardMaterial {
-    const full = age !== null;
-    const key = `${slot}|${color}|${full ? `${age}|${soft}` : 'lite'}`;
+  /** Lite materials (most houses) are shared per colour + wear bucket; full ones also per style softness. */
+  private material(slot: string, color: string, age = 0.35, full = false, soft = 1): THREE.MeshStandardMaterial {
+    const key = `${slot}|${color}|${age}|${full ? `full|${soft}` : 'lite'}`;
     let m = this.materials.get(key);
     if (!m) {
       const look = LOOK[slot] ?? { roughness: 0.8, metalness: 0 };
       m = enhanceMaterial(new THREE.MeshStandardMaterial({ ...look, color, side: look.side ?? THREE.FrontSide }), kindForSlot(slot), !full);
-      if (full) setAge([m], age, soft);
+      setAge([m], age, soft);
       this.materials.set(key, m);
     }
     return m;
   }
+
 
   // ---- Picking -------------------------------------------------------------------------------
 

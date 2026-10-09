@@ -90,7 +90,11 @@ const SURFACE = /* glsl */ `
     float streak = smoothstep(0.58 - 0.12 * uLookAge, 0.9, lookFbm(vec3(along * 2.6, h * 0.22, 3.7)));
     c *= (1.0 - splash) * (1.0 - 0.08 * uLookAge * streak);
 #else
-    c *= 1.0 - 0.12 * (1.0 - smoothstep(0.0, 1.6, h));
+    // Lite (city distance): cheap wear only — faded, darker, ground dirt band; no noise.
+    float lw = smoothstep(0.0, 0.9, uLookAge);
+    float llum = dot(c, vec3(0.299, 0.587, 0.114));
+    c = mix(c, vec3(llum) * vec3(0.97, 0.95, 0.9), 0.55 * lw) * (1.0 - 0.12 * lw);
+    c *= 1.0 - (0.1 + 0.35 * lw) * (1.0 - smoothstep(0.0, 0.8 + 1.2 * lw, h));
 #endif
 #ifndef LOOK_LITE
     {
