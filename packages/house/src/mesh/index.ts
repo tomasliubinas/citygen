@@ -14,6 +14,7 @@ export type HouseMaterial = (typeof HOUSE_MATERIALS)[number];
 export function buildHouseMesh(spec: HouseSpec): MeshData {
   const mb = new MeshBuilder();
   buildFacades(mb, spec);
+  buildFloorPlates(mb, spec);
   buildMouldings(mb, spec);
   buildRoof(mb, spec);
   for (const p of spec.pediments) pediment(mb, p);
@@ -32,6 +33,27 @@ export function buildHouseMesh(spec: HouseSpec): MeshData {
   }
   buildWeathering(mb, spec);
   return mb.bake();
+}
+
+/**
+ * Floor plates inside the shell: a solid base from the ground to the ground-floor level,
+ * a slab at every floor and one under the attic, so the house is closed when the camera
+ * gets inside or looks through a window (and in the exported model). Laid out per mass
+ * rectangle (they tile the footprint), set just inside the outer wall face.
+ */
+function buildFloorPlates(mb: MeshBuilder, spec: HouseSpec): void {
+  const e = 0.05;
+  const T = 0.25;
+  const wallTop = spec.roof.eaveY - spec.roof.corniceHeight;
+  const levels = [...spec.floors.slice(1).map((f) => f.elevation), wallTop];
+  mb.paint('stone', () => {
+    for (const m of spec.masses) {
+      const [x0, x1, z0, z1] = [m.x0 + e, m.x1 - e, m.z0 + e, m.z1 - e];
+      if (x1 - x0 < 0.2 || z1 - z0 < 0.2) continue;
+      mb.box(x0, 0, z0, x1, spec.floors[0].elevation, z1);
+      for (const y of levels) mb.box(x0, y - T, z0, x1, y, z1);
+    }
+  });
 }
 
 /** Horizontal articulation: plinth, string courses between floors, main cornice. */

@@ -196,8 +196,11 @@ view.onPick = (plot: PlotSpec | null, spec: HouseSpec | null) => {
     const e = plot.house.envelope;
     const q = new URLSearchParams({
       seed: plot.seed, x0: String(e.x), z0: String(e.z), x1: String(e.x + e.width), z1: String(e.z + e.depth),
-      front: 'south', c: plot.centrality.toFixed(2), style: plot.style,
+      front: 'south', c: plot.centrality.toFixed(2), style: plot.style, time: state.time,
     });
+    // Terraced houses: keep their fire walls, or the editor shows windows where the neighbours are.
+    if (plot.house.partyWalls?.left) q.set('pl', '1');
+    if (plot.house.partyWalls?.right) q.set('pr', '1');
     window.open(`./index.html#${q}`, '_blank');
   });
   box.replaceChildren(h, p1, ul, open);
