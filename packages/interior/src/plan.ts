@@ -25,7 +25,8 @@ import type {
 
 const PART = 0.15;
 const H2 = PART / 2;
-const CELLAR_H = 2.75;
+/** Cellar storey height: at least 2.75 m, deeper under tall houses (vaulted cellars of big town houses). */
+const CELLAR_MIN = 2.75;
 const TREAD = 0.27;
 const MAX_RISER = 0.18;
 
@@ -71,7 +72,8 @@ export function planInterior(house: HouseSpec, opts: InteriorOptions = {}): Inte
 
   const levels: LevelSpec[] = [];
   const ordinal = (i: number) => (i === 1 ? '1st' : i === 2 ? '2nd' : i === 3 ? '3rd' : `${i}th`);
-  levels.push(level(0, 'cellar', null, 'Cellar', 'C', floors[0].elevation - CELLAR_H, CELLAR_H, CELLAR_H - 0.18));
+  const cellarH = Math.round(Math.max(CELLAR_MIN, Math.min(3.9, floors[0].height * 0.75)) * 100) / 100;
+  levels.push(level(0, 'cellar', null, 'Cellar', 'C', floors[0].elevation - cellarH, cellarH, cellarH - 0.18));
   floors.forEach((f, i) => levels.push(level(i + 1, 'floor', i, i === 0 ? 'Ground floor' : `${ordinal(i)} floor`, i === 0 ? 'G' : String(i), f.elevation, f.height, f.height - 0.18)));
   if (hasAttic) levels.push(level(nF + 1, 'attic', null, 'Attic', 'A', eave, atticH, 2.3));
 

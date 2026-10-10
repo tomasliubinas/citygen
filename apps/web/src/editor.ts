@@ -218,14 +218,6 @@ export class PlanEditor {
     ctx.strokeRect(ax + 0.5, az + 0.5, bx - ax - 1, bz - az - 1);
     ctx.setLineDash([]);
 
-    ctx.strokeStyle = '#c2643c';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    if (this.front === 'south') { ctx.moveTo(ax, bz); ctx.lineTo(bx, bz); }
-    if (this.front === 'north') { ctx.moveTo(ax, az); ctx.lineTo(bx, az); }
-    if (this.front === 'east') { ctx.moveTo(bx, az); ctx.lineTo(bx, bz); }
-    if (this.front === 'west') { ctx.moveTo(ax, az); ctx.lineTo(ax, bz); }
-    ctx.stroke();
 
     ctx.fillStyle = '#3a3d42';
     for (const [cx, cz] of [[ax, az], [bx, az], [ax, bz], [bx, bz]]) ctx.fillRect(cx - 3, cz - 3, 6, 6);
