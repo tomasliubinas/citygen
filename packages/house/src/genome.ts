@@ -97,6 +97,8 @@ export interface ManorGenome {
   tallGround: number;
   /** Glazed-tile frieze under the eaves. */
   accentFrieze: boolean;
+  /** Ground floor repainted in its own shade (shops, a newer owner): wall colour multiplier, or null. */
+  groundPaint: [number, number, number] | null;
   endWings: boolean;
   wingBalconies: boolean;
   porticoBalcony: boolean;
@@ -177,6 +179,8 @@ export interface StylePreset {
     ashlar?: number;
     risalitBalcony?: number;
     tallGround?: number;
+    groundPaint?: number;
+    accentDoor?: number;
   };
   colors: { wall: Weighted<string>; roof: Weighted<string>; frame: Weighted<string>; door: Weighted<string>; accent: Weighted<string>; trim?: Weighted<string>; stone?: Weighted<string> };
 }
@@ -221,6 +225,8 @@ export const CLASSICIST_MANOR: StylePreset = {
   dormers: [['none', 0.3], ['alternate', 0.45], ['all', 0.25]],
   chance: {
     tallGround: 0.08,
+    groundPaint: 0.05,
+    accentDoor: 0.15,
     rusticatedGround: 0.6,
     archedGround: 0.4,
     endWings: 0.65,
@@ -273,6 +279,8 @@ export const BEAUX_ARTS: StylePreset = {
   dormers: [['all', 0.8], ['alternate', 0.2]],
   chance: {
     tallGround: 0.4,
+    groundPaint: 0.15,
+    accentDoor: 0.25,
     rusticatedGround: 0.95,
     archedGround: 0.85,
     endWings: 0.85,
@@ -336,6 +344,8 @@ export const ART_NOUVEAU: StylePreset = {
   maxFloors: null,
   chance: {
     tallGround: 0.3,
+    groundPaint: 0.2,
+    accentDoor: 0.3,
     rusticatedGround: 0.25,
     archedGround: 0.45,
     endWings: 0,
@@ -399,6 +409,8 @@ export const KLAIPEDA: StylePreset = {
   doorStyle: [['classical', 1]],
   chance: {
     tallGround: 0.4,
+    groundPaint: 0,
+    accentDoor: 0.3,
     rusticatedGround: 0, archedGround: 0.8, endWings: 0.75, wingBalconies: 0, porticoBalcony: 0, fanlight: 1, oculus: 0.55,
     dentils: 0, pairedColumns: 0, parapet: 0, balconets: 0, cresting: 0, tower: 1, smallPanes: 0.8, accentFrieze: 0,
     rearTowers: 0, stringCourses: 0,
@@ -456,6 +468,8 @@ export const KAUNAS_DECO: StylePreset = {
   balconetPattern: [['alternate', 0.35], ['ends', 0.25], ['center', 0.25], ['all', 0.15]],
   chance: {
     tallGround: 0.65,
+    groundPaint: 0.25,
+    accentDoor: 0.25,
     rusticatedGround: 0.35, archedGround: 0, endWings: 0.4, wingBalconies: 0.6, porticoBalcony: 0, fanlight: 0, oculus: 0,
     dentils: 0, pairedColumns: 0, parapet: 0, balconets: 0.5, cresting: 0, tower: 0, smallPanes: 0, accentFrieze: 0.25,
     stringCourses: 1, entranceStrip: 0.65, flagpole: 0, decoBands: 0.45, portholes: 0.4, fluting: 0.35, groundCladding: 0.5,
@@ -508,6 +522,8 @@ export const VILNIUS_OLD_TOWN: StylePreset = {
   doorStyle: [['gateway', 1]],
   chance: {
     tallGround: 0.25,
+    groundPaint: 0.25,
+    accentDoor: 0.3,
     rusticatedGround: 0.15, archedGround: 0.35, endWings: 0.2, wingBalconies: 0.2, porticoBalcony: 0, fanlight: 1, oculus: 0.5,
     dentils: 0.2, pairedColumns: 0, parapet: 0, balconets: 0.1, cresting: 0, tower: 0, smallPanes: 0.6, accentFrieze: 0,
   },
@@ -553,6 +569,8 @@ export const FRENCH_CLASSICAL: StylePreset = {
   balconetPattern: [['all', 0.75], ['ends', 0.25]],
   chance: {
     tallGround: 0.6,
+    groundPaint: 0.2,
+    accentDoor: 0.3,
     rusticatedGround: 0, archedGround: 0.9, endWings: 0.2, wingBalconies: 0, porticoBalcony: 0, fanlight: 0.3, oculus: 0.3,
     dentils: 0.4, pairedColumns: 0, parapet: 0, balconets: 1, cresting: 0, tower: 0, smallPanes: 0, accentFrieze: 0,
     ashlar: 1,
@@ -577,6 +595,11 @@ export const STYLES: Record<StyleId, StylePreset> = {
   'art-nouveau': ART_NOUVEAU,
   'french-classical': FRENCH_CLASSICAL,
 };
+
+/** Ground-floor repaint shades, as multipliers on the wall colour: deeper, ochre, grey-green, cool grey, fresher. */
+const GROUND_PAINTS: [number, number, number][] = [[0.84, 0.82, 0.8], [1.0, 0.9, 0.72], [0.84, 0.9, 0.82], [0.82, 0.85, 0.9], [1.05, 1.04, 1.02]];
+/** Painted accent doors: oxblood, bottle green, navy, natural oak. */
+const ACCENT_DOORS: Weighted<string> = [['#6a1f24', 3], ['#1f3d2b', 3], ['#1f2d4a', 2], ['#7a5432', 2]];
 
 export function createGenome(seed: string, styleId: StyleId = 'classicist-manor'): ManorGenome {
   const p = STYLES[styleId];
@@ -652,11 +675,13 @@ export function createGenome(seed: string, styleId: StyleId = 'classicist-manor'
     dormers: r('dormers').weighted(p.dormers),
     dentils: r('dentils').chance(p.chance.dentils),
     stairSide: r('stair-side').chance(0.5) ? 'left' : 'right',
+    groundPaint: r('ground-paint').chance(p.chance.groundPaint ?? 0.15) ? GROUND_PAINTS[r('ground-paint-k').int(0, GROUND_PAINTS.length - 1)] : null,
     colors: {
       wall: r('c-wall').weighted(p.colors.wall),
       roof: r('c-roof').weighted(p.colors.roof),
       frame: r('c-frame').weighted(p.colors.frame),
-      door: r('c-door').weighted(p.colors.door),
+      // Sometimes a painted accent door instead of the style's usual dark wood.
+      door: r('accent-door').chance(p.chance.accentDoor ?? 0.25) ? r('accent-door-c').weighted(ACCENT_DOORS) : r('c-door').weighted(p.colors.door),
       accent: r('c-accent').weighted(p.colors.accent),
       trim: p.colors.trim ? r('c-trim').weighted(p.colors.trim) : '#fbfaf6',
       stone: p.colors.stone ? r('c-stone').weighted(p.colors.stone) : '#bdb7ad',

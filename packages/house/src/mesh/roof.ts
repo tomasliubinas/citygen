@@ -233,15 +233,31 @@ function dormer(mb: MeshBuilder, x: number, zf: number, d: DormerSpec, roofPitch
     const rad = Math.min((w - 0.36) / 2, d.windowHeight / 2);
     const yc = (ys + yt) / 2;
     mb.paint('trim', () => {
-      mb.box(l + cw, ys, zf - 0.06, r - cw, yt, zf + 0.02);
+      // Front panel with a round hole: vertical strips stopping just outside the circle (the
+      // reveal covers the small gaps); the window sits behind the ring, no deeper than the panel.
+      const n = 28;
+      const strip = (xa: number, xb: number, y0s: number, y1s: number) => { if (y1s - y0s > 1e-3) mb.box(xa, y0s, zf - 0.06, xb, y1s, zf + 0.02); };
+      strip(l + cw, x - rad, ys, yt);
+      strip(x + rad, r - cw, ys, yt);
+      for (let i = 0; i < n; i++) {
+        const xa = x - rad + (2 * rad * i) / n;
+        const xb = xa + (2 * rad) / n;
+        // Nearest edge to the centre: the box stays fully outside the circle.
+        const dx = xa < x && xb > x ? 0 : Math.min(Math.abs(xa - x), Math.abs(xb - x));
+        const hh = Math.sqrt(Math.max(0, rad * rad - dx * dx));
+        strip(xa, xb, ys, yc - hh);
+        strip(xa, xb, yc + hh, yt);
+      }
+      mb.arcBand(x, yc, rad, rad + 0.06, 0, Math.PI * 2, zf - 0.06, zf + 0.02, 24);
       mb.arcBand(x, yc, rad, rad + 0.13, 0, Math.PI * 2, zf + 0.02, zf + 0.12, 24);
       mb.arcBand(x, yt, w / 2 - 0.02, w / 2 + 0.1, 0, Math.PI, zf - 0.04, zf + 0.1, 14);
       mb.with(translation(x, yt + w / 2 - 0.06, 0), () => mb.extrude([[-0.09, 0], [0.09, 0], [0.12, 0.24], [-0.12, 0.24]], zf - 0.02, zf + 0.13));
     });
-    mb.paint('glass', () => mb.extrude(circle(x, yc, rad, 20), zf + 0.02, zf + 0.05));
+    // Glass at the back of the front panel: the steep roof slope sits right behind it.
+    mb.paint('glass', () => mb.extrude(circle(x, yc, rad, 20), zf - 0.055, zf - 0.04));
     mb.paint('frame', () => {
-      mb.box(x - rad, yc - 0.025, zf + 0.05, x + rad, yc + 0.025, zf + 0.08);
-      mb.box(x - 0.025, yc - rad, zf + 0.05, x + 0.025, yc + rad, zf + 0.08);
+      mb.box(x - rad, yc - 0.025, zf - 0.04, x + rad, yc + 0.025, zf - 0.01);
+      mb.box(x - 0.025, yc - rad, zf - 0.04, x + 0.025, yc + rad, zf - 0.01);
     });
     mb.paint('wall', () => mb.extrude(circle(x, yt, w / 2 - 0.02, 12, 0, Math.PI), zf - 0.06, zf - 0.04));
     mb.paint('roof', () => mb.arcBand(x, yt, w / 2 - 0.04, w / 2 + 0.06, 0, Math.PI, zb, zf - 0.04, 12));

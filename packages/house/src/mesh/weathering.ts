@@ -103,18 +103,19 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
 /** Rust bleeding down the wall from iron balconies and balconets. */
 function buildRust(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
   if (cond < 0.08) return;
-  const a = 0.4 * cond * cond;
+  // Shows from moderate wear on (iron sheds rust long before a house is derelict).
+  const a = 0.5 * Math.pow(cond, 1.4);
   mb.paint('rust', () => {
     for (const b of spec.balconies) {
       if (b.railing === 'stone' || b.side !== 'front') continue;
       const r = Rng.create(spec.input.seed, 'rust', b.id);
       const z = b.zFace + 0.014;
       const top = b.y - (b.support === 'consoles' ? 0.28 : 0.05);
-      const n = Math.max(2, Math.round((b.x1 - b.x0) / 0.5));
+      const n = Math.max(2, Math.round((b.x1 - b.x0) / 0.38));
       for (let k = 0; k < n; k++) {
         const cx = b.x0 + ((k + 0.5) / n) * (b.x1 - b.x0) + (r.next() - 0.5) * 0.15;
         const hw = r.range(0.03, 0.08);
-        const yb = top - r.range(0.4, 1.4) * (0.5 + cond);
+        const yb = top - r.range(0.4, 1.6) * (0.6 + cond);
         const al = a * r.range(0.5, 1);
         mb.quadAlpha([cx - hw, yb, z], [cx, yb, z], [cx, top, z], [cx - hw, top, z], [0, 0, al, 0]);
         mb.quadAlpha([cx, yb, z], [cx + hw, yb, z], [cx + hw, top, z], [cx, top, z], [0, 0, 0, al]);

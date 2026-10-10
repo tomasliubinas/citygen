@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { addNavHint } from './render/nav';
 import { bushGeometry, treeVariants } from './render/trees';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from './render/look';
+import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, setGroundPaint, setLedges, stainMaterial, type Look, type TimeOfDay } from './render/look';
 import type { InteriorSpec } from '@citygen/interior';
 import type { MeshData } from '@citygen/core';
 import type { HouseSpec, WorldEdge } from '@citygen/house';
@@ -133,6 +133,14 @@ export class HouseViewer {
       this.house.add(m);
     }
     setAge(this.materials.values(), spec.weathering.condition, spec.weathering.strength);
+    // Soot bands under the string courses and the cornice.
+    setLedges([
+      ...(spec.genome.stringCourses ? spec.floors.slice(1).map((f) => f.elevation - 0.17) : []),
+      spec.roof.eaveY - spec.roof.corniceHeight,
+    ]);
+    const g = spec.genome;
+    const e1 = spec.floors[1]?.elevation;
+    setGroundPaint(e1 !== undefined && !spec.rusticatedGround && !g.groundCladding && !g.ashlar ? g.groundPaint : null, (e1 ?? 0) - 0.17);
     this.house.position.set(spec.placement.x, 0, spec.placement.z);
     this.house.rotation.y = spec.placement.rotationY;
     this.buildGarden(spec);

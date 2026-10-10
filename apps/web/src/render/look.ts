@@ -23,6 +23,8 @@ varying vec2 vLookUv;
 uniform int uLookKind;
 uniform float uLookAge;
 uniform float uLookSoft;
+uniform float uLookLedge[8];
+uniform vec4 uLookGround;
 float vLookRoofSpot = 0.0;
 float lookHash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float lookHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -66,8 +68,13 @@ const SURFACE = /* glsl */ `
       float fade = clamp(1.5 - max(bw.x, bw.y) * 5.0, 0.0, 1.0);
       float mortar = max(lookLine(u, 0.025), lookLine(v, 0.07)) * fade;
       float r = lookHash2(vec2(floor(u), row));
-      c *= mix(1.0, 0.86 + 0.24 * r, fade);
-      if (r > 0.94) c *= mix(1.0, 0.72, fade);
+      float r2 = lookHash2(vec2(row, floor(u)) + 7.3);
+      // Uneven firing: tone and a slight warm/cool shift per brick, the odd dark clinker.
+      c *= mix(vec3(1.0), (0.82 + 0.3 * r) * vec3(1.0 + 0.06 * (r2 - 0.5), 1.0, 1.0 - 0.08 * (r2 - 0.5)), fade);
+      if (r > 0.92) c *= mix(1.0, 0.62, fade);
+      // Recessed joint: shadowed under each brick, a lit lip on top of the one below.
+      float fvB = fract(v);
+      c *= 1.0 - fade * (0.16 * (1.0 - smoothstep(0.0, 0.12, fvB)) - 0.06 * smoothstep(0.82, 0.93, fvB));
       // Mortar close to the brick tone: low contrast, so it never turns into moiré.
       c = mix(c, c * 0.72 + vec3(0.07, 0.065, 0.06), mortar * 0.6);
     } else if (uLookKind == 3 && abs(wn.y) < 0.5) {
@@ -78,8 +85,14 @@ const SURFACE = /* glsl */ `
       vec2 aw = fwidth(vec2(u, v));
       float fade = clamp(1.5 - max(aw.x, aw.y) * 6.0, 0.0, 1.0);
       float joint = max(lookLine(u, 0.012), lookLine(v, 0.025)) * fade;
-      c *= mix(1.0, 0.93 + 0.12 * lookHash2(vec2(floor(u), row)), fade);
+      float ra = lookHash2(vec2(floor(u), row));
+      float rb = lookHash2(vec2(row, floor(u)) + 3.1);
+      // Each block from its own bed of stone: tone and a slight warm/cool cast.
+      c *= mix(vec3(1.0), (0.88 + 0.2 * ra) * vec3(1.0 + 0.05 * (rb - 0.5), 1.0, 1.0 - 0.06 * (rb - 0.5)), fade);
       c *= 1.0 - joint * 0.28;
+      // Chamfered joints: the bevel under each block faces down (shade), the one on top up (light).
+      float fvA = fract(v);
+      c *= 1.0 - fade * (0.14 * (1.0 - smoothstep(0.0, 0.07, fvA)) - 0.07 * smoothstep(0.9, 0.97, fvA));
     } else {
       // Plaster: broad tonal variation; old plaster yellows a little.
 #ifndef LOOK_LITE
@@ -114,6 +127,17 @@ const SURFACE = /* glsl */ `
       // Blotchy repaints: patches a shade lighter or darker.
       float blot = lookFbm(wp * 0.16 + 11.0);
       c *= 1.0 + wear * (smoothstep(0.58, 0.66, blot) * 0.06 - smoothstep(0.34, 0.26, blot) * 0.05);
+      // Rain shelter: below each projection the wall is never washed and soot builds up,
+      // darkest right under the ledge, fading over a band that grows with wear.
+      if (abs(wn.y) < 0.5) {
+        float shelter = 0.0;
+        for (int i = 0; i < 8; i++) {
+          float d = uLookLedge[i] - h;
+          shelter = max(shelter, smoothstep(-0.02, 0.04, d) * (1.0 - smoothstep(0.05, 0.45 + 0.6 * wear, d)));
+        }
+        shelter *= 0.75 + 0.5 * lookNoise(vec3(along * 1.7, h * 3.0, 5.3));
+        c *= mix(vec3(1.0), vec3(0.8, 0.79, 0.78), shelter * (0.25 + 0.75 * wear));
+      }
       // Rising damp: a darker, uneven band above the ground.
       float damp = (1.0 - smoothstep(0.5, 1.2 + 0.5 * lookNoise(wp * 0.6), h)) * wear;
       c *= 1.0 - 0.4 * damp;
@@ -129,6 +153,11 @@ const SURFACE = /* glsl */ `
       }
     }
 #endif
+    // Repainted ground floor (plaster only), up to the string course: applied after the
+    // fading so the newer paint keeps its colour.
+    if (uLookKind == 1 && brick < 0.5 && abs(wn.y) < 0.5 && uLookGround.w > 0.0) {
+      c *= mix(vec3(1.0), uLookGround.rgb, 1.0 - smoothstep(-0.01, 0.01, h - uLookGround.w));
+    }
 
   } else if (uLookKind == 4) {
     // Roof: staggered slates / tiles in rows, each a slightly different tone.
@@ -188,6 +217,22 @@ if ((uLookKind == 1 || uLookKind == 2) && lookBrick < 0.5) {
 #endif
 `;
 
+/**
+ * Undersides of the house's horizontal projections (string courses, cornice), world y.
+ * Rain never washes the wall just below them, so soot collects there. Unused slots far below ground.
+ */
+export const lookLedges = { value: new Array<number>(8).fill(-1000) };
+export function setLedges(ys: number[]): void {
+  for (let i = 0; i < 8; i++) lookLedges.value[i] = ys[i] ?? -1000;
+}
+
+/** Ground-floor repaint: rgb multiplier on plaster below w (world y); w < 0 = none. */
+export const lookGround = { value: new THREE.Vector4(1, 1, 1, -1) };
+export function setGroundPaint(mult: [number, number, number] | null, top: number): void {
+  if (mult) lookGround.value.set(mult[0], mult[1], mult[2], top);
+  else lookGround.value.set(1, 1, 1, -1);
+}
+
 /** Add the procedural surface layer to a standard material (idempotent). */
 /** `lite`: only the cheap line patterns (brick, tiles, joints) — no per-pixel noise layers. */
 export function enhanceMaterial(mat: THREE.MeshStandardMaterial, kind: SurfaceKind, lite = false): THREE.MeshStandardMaterial {
@@ -200,6 +245,8 @@ export function enhanceMaterial(mat: THREE.MeshStandardMaterial, kind: SurfaceKi
     shader.uniforms.uLookKind = { value: KIND[kind] };
     shader.uniforms.uLookAge = mat.userData.age;
     shader.uniforms.uLookSoft = mat.userData.soft;
+    shader.uniforms.uLookLedge = lookLedges;
+    shader.uniforms.uLookGround = lookGround;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;\nvarying vec2 vLookUv;\nattribute vec2 aFacade;')
       .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvLookNormal = normalize(mat3(modelMatrix) * objectNormal);')

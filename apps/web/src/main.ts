@@ -48,7 +48,7 @@ function readHash(): Partial<State> {
 }
 
 const state: State = {
-  rect: { x0: -23, z0: -12, x1: 13, z1: 8 },
+  rect: { x0: -28, z0: -17, x1: 24, z1: 13 },
   front: 'south',
   seed: 'amber',
   centrality: 0.2,
@@ -157,7 +157,7 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#front button')) {
 $('reset-view').addEventListener('click', () => viewer.frame());
 const initialView = new URLSearchParams(location.hash.slice(1)).get('view');
 // The default view: a chosen camera on the default house.
-const DEFAULT_CAM = '31.9,9.6,33.5,-3.0,4.9,-0.7';
+const DEFAULT_CAM = '51.7,9.9,40.0,6.7,8.0,-0.0';
 const hashAtLoad = new URLSearchParams(location.hash.slice(1));
 const initialCam = hashAtLoad.get('cam') ?? (hashAtLoad.has('seed') ? null : DEFAULT_CAM);
 let camRestored = false;

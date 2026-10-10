@@ -3,7 +3,7 @@
  *   npm run house -- --seed oak --width 30 --depth 20 --centrality 0.3 [--front east] [--floors 2] [--json]
  */
 import { meshBounds, triangleCount } from '@citygen/core';
-import { buildHouseMesh, generateHouse, type WorldEdge } from '@citygen/house';
+import { buildHouseMesh, generateHouse, type StyleId, type WorldEdge } from '@citygen/house';
 
 const args = new Map<string, string>();
 const argv = process.argv.slice(2);
@@ -18,6 +18,7 @@ const spec = generateHouse({
   front: (args.get('front') as WorldEdge) ?? 'south',
   centrality: Number(args.get('centrality') ?? 0),
   floors: args.has('floors') ? Number(args.get('floors')) : null,
+  ...(args.has('style') ? { style: args.get('style') as StyleId } : {}),
 });
 
 if (args.has('json')) {
