@@ -2,6 +2,7 @@ import { buildHouseMesh, generateHouse, MAX_ENVELOPE, MIN_ENVELOPE, STYLES, type
 import { buildInteriorMesh, planInterior, type InteriorSpec } from '@citygen/interior';
 import { PlanEditor, type Rect } from './editor';
 import { cameraFromHash, cameraToHash, onCameraSettled } from './render/camera-hash';
+import { addMoreCue } from './render/more';
 import { HouseViewer } from './viewer';
 
 interface State {
@@ -284,3 +285,5 @@ function renderRooms(interior: InteriorSpec): void {
 
 viewer.setTime(state.time);
 schedule();
+
+addMoreCue(document.querySelector<HTMLElement>('.panel')!);

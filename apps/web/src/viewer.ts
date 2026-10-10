@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { addNavToggle } from './render/nav';
+import { addNavHint } from './render/nav';
+import { bushGeometry, treeVariants } from './render/trees';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from './render/look';
 import type { InteriorSpec } from '@citygen/interior';
@@ -90,7 +91,7 @@ export class HouseViewer {
     this.controls.maxPolarAngle = Math.PI * 0.495;
     this.controls.minDistance = 6;
     this.controls.maxDistance = 400;
-    addNavToggle(container, this.controls as never);
+    addNavHint(container, this.controls as never);
 
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
@@ -373,38 +374,95 @@ export class HouseViewer {
     const lawn = new THREE.Mesh(new THREE.PlaneGeometry(w - 0.4, d - 0.4).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#8fa274', roughness: 1 }));
     lawn.position.set((g.x0 + g.x1) / 2, 0.025, (g.z0 + g.z1) / 2);
     lawn.receiveShadow = true;
-    const hedgeMat = new THREE.MeshStandardMaterial({ color: '#4f6a3e', roughness: 1 });
-    const hedge = (x0: number, x1: number, z0: number, z1: number) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 1.1, z1 - z0), hedgeMat);
-      m.position.set((x0 + x1) / 2, 0.55, (z0 + z1) / 2);
+    // Seeded so the same plot keeps the same garden.
+    let seed = 0;
+    for (const ch of spec.input.seed) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const greens = ['#4f6a3e', '#5a7444', '#46603a', '#617c4a'].map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }));
+    /** Irregular leafy blob: an icosahedron with jittered vertices. */
+    const blob = (r: number, detail = 1) => {
+      const geo = new THREE.IcosahedronGeometry(r, detail);
+      const pos = geo.getAttribute('position');
+      const salt = rnd() * 100;
+      for (let i = 0; i < pos.count; i++) {
+        // Same jitter for the same corner (faces share corners), so the blob stays closed.
+        const h = Math.sin(pos.getX(i) * 12.9898 + pos.getY(i) * 78.233 + pos.getZ(i) * 37.719 + salt) * 43758.5453;
+        const k = 0.84 + (h - Math.floor(h)) * 0.32;
+        pos.setXYZ(i, pos.getX(i) * k, pos.getY(i) * k * 0.9, pos.getZ(i) * k);
+      }
+      geo.computeVertexNormals();
+      return geo;
+    };
+    const add = (m: THREE.Mesh) => {
       m.castShadow = m.receiveShadow = true;
       this.garden.add(m);
     };
-    hedge(g.x0, g.x1, g.z0, g.z0 + 0.6);
-    hedge(g.x0, g.x0 + 0.6, g.z0, g.z1);
-    hedge(g.x1 - 0.6, g.x1, g.z0, g.z1);
+    // Clipped hedge: 1 m segments with slightly uneven height and width, a rounded cap.
+    const hedge = (x0: number, z0: number, x1: number, z1: number) => {
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const n = Math.max(1, Math.round(len / 1.0));
+      const ang = Math.atan2(x1 - x0, z1 - z0);
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n;
+        const h = 1.05 + rnd() * 0.15;
+        const wd = 0.6 + rnd() * 0.1;
+        const seg = new THREE.Mesh(new THREE.BoxGeometry(wd, h, len / n + 0.04), greens[i % 2]);
+        seg.position.set(x0 + (x1 - x0) * t, h / 2, z0 + (z1 - z0) * t);
+        seg.rotation.y = ang;
+        add(seg);
+        const cap = new THREE.Mesh(blob(0.42, 0), greens[2 + (i % 2)]);
+        cap.scale.set(wd * 1.4, 0.5, (len / n) * 1.5);
+        cap.position.set(seg.position.x, h, seg.position.z);
+        cap.rotation.y = ang;
+        add(cap);
+      }
+    };
+    hedge(g.x0 + 0.3, g.z0 + 0.3, g.x1 - 0.3, g.z0 + 0.3);
+    hedge(g.x0 + 0.3, g.z0 + 0.3, g.x0 + 0.3, g.z1);
+    hedge(g.x1 - 0.3, g.z0 + 0.3, g.x1 - 0.3, g.z1);
     const path = new THREE.Mesh(new THREE.PlaneGeometry(1.4, d - 0.6).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#cfc6b3', roughness: 1 }));
     path.position.set(0, 0.035, (g.z0 + g.z1) / 2 + 0.3);
     path.receiveShadow = true;
     this.garden.add(lawn, path);
-    // A few trees, seeded so the same plot keeps the same garden.
-    let seed = 0;
-    for (const ch of spec.input.seed) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
-    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-    const crownMat = new THREE.MeshStandardMaterial({ color: '#5f7a4a', roughness: 1 });
+    // Gravel forecourt at the foot of the garden steps, wider than the steps and their side flights.
+    const gs = spec.stairs.find((st) => st.role === 'garden');
+    if (gs) {
+      const run = gs.steps * 0.34;
+      const fx0 = Math.max(g.x0 + 0.8, gs.x0 - run - 1.2);
+      const fx1 = Math.min(g.x1 - 0.8, gs.x1 + run + 1.2);
+      const fd = Math.min(3.2, d * 0.3);
+      const court = new THREE.Mesh(new THREE.PlaneGeometry(fx1 - fx0, fd + 0.6).rotateX(-Math.PI / 2), path.material);
+      court.position.set((fx0 + fx1) / 2, 0.036, g.z1 - fd / 2 + 0.3);
+      court.receiveShadow = true;
+      this.garden.add(court);
+    }
+    // Low bushes along the path, and trees — the same open leafy look as in the city.
+    const variants = treeVariants(3);
+    const leafMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, side: THREE.DoubleSide });
+    for (let z = g.z0 + 2; z < g.z1 - 3.6; z += 2.2 + rnd() * 1.2) {
+      for (const side of [-1, 1]) {
+        if (rnd() < 0.3) continue;
+        const r = 0.35 + rnd() * 0.25;
+        const b = new THREE.Mesh(bushGeometry(r), leafMat);
+        b.position.set(side * (1.2 + rnd() * 0.3), r * 0.7, z);
+        add(b);
+      }
+    }
     const trunkMat = new THREE.MeshStandardMaterial({ color: '#5a4636', roughness: 1 });
-    const count = Math.min(12, Math.floor((w * d) / 90));
+    const count = Math.min(10, Math.floor((w * d) / 110));
     for (let i = 0; i < count; i++) {
-      const x = g.x0 + 2 + rnd() * (w - 4);
-      if (Math.abs(x) < 2) continue;
-      const z = g.z0 + 2 + rnd() * (d - 4);
-      const sc = 0.8 + rnd() * 0.6;
-      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.6 * sc, 1), crownMat);
-      crown.position.set(x, 3.6 * sc + 1.2, z);
-      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 3.4 * sc, 6), trunkMat);
-      trunk.position.set(x, 1.7 * sc, z);
-      crown.castShadow = trunk.castShadow = true;
-      this.garden.add(crown, trunk);
+      const x = g.x0 + 2.5 + rnd() * (w - 5);
+      if (Math.abs(x) < 2.2) continue;
+      const z = g.z0 + 2.5 + rnd() * Math.max(1, d - 7.5);
+      const sc = 0.8 + rnd() * 0.5;
+      const vg = variants[i % variants.length];
+      for (const [geo, mat] of [[vg.trunk, trunkMat], [vg.crown, leafMat]] as const) {
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(x, 0, z);
+        m.rotation.y = rnd() * Math.PI * 2;
+        m.scale.setScalar(sc);
+        add(m);
+      }
     }
     this.garden.position.set(spec.placement.x, 0, spec.placement.z);
     this.garden.rotation.y = spec.placement.rotationY;

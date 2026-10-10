@@ -113,7 +113,10 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
   let elev = plinth;
   for (let i = 0; i < nFloors; i++) {
     const kind: FloorKind = i === 0 ? 'ground' : i === 1 ? 'main' : i === nFloors - 1 ? 'top' : 'upper';
-    const height = nFloors === 1 ? g.floorHeights.main : g.floorHeights[kind];
+    const base = nFloors === 1 ? g.floorHeights.main : g.floorHeights[kind];
+    // The ground floor is never lower than the floor above it; tall-ground styles add more.
+    // Ground floor: always clearly taller than the floor above (×1.18), tall-ground styles more.
+    const height = i === 0 && nFloors >= 2 ? Math.max(base, g.floorHeights.main) * Math.max(1.18, g.tallGround) : base;
     floors.push({ index: i, kind, elevation: r3(elev), height: r3(height) });
     elev += height;
   }
@@ -467,7 +470,10 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
         const head = g.archedGround ? 'arched' : g.windowHead;
         const crown: WindowCrown =
           single && primary ? crownPattern(d) : head === 'arched' || g.rusticatedGround ? 'keystone' : 'cornice';
-        return plain({ sill: e + 0.95, height: Math.min(winW * g.windowRatio, H - 0.95 - 0.8), head, crown, apron: single && primary, sillConsoles: single && primary });
+        // A tall ground floor gets proportionally taller windows.
+        // Ground-floor windows are never shorter than the main-floor windows above.
+        const mainH = g.glazing === 'deco' ? winW * Math.max(g.windowRatio * 1.35, 1.75) : winW * g.windowRatio * 1.1;
+        return plain({ sill: e + 0.95, height: Math.min(Math.max(winW * g.windowRatio * 1.1, mainH) * g.tallGround, H - 0.95 - 0.8), head, crown, apron: single && primary, sillConsoles: single && primary });
       }
       case 'main':
         return plain({
@@ -522,7 +528,8 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
         const gateway = g.doorStyle === 'gateway';
         addOpening(fc, {
           kind: 'door', floor: 0, u: uOf(fc, x, z), sill: f.elevation, width: gateway ? clamp(bayW - 0.7, 2.2, 3.0) : doorW,
-          height: Math.min(f.height - doorMargin, gateway ? 3.9 : g.glazing === 'deco' ? 3.5 : fan ? 3.6 : 3.2), head: fan || gateway ? 'arched' : 'flat',
+          // A tall ground floor gets a proportionally taller door.
+          height: Math.min(f.height - doorMargin, Math.max(gateway ? 3.9 : g.glazing === 'deco' ? 3.5 : fan ? 3.6 : 3.2, (f.height - doorMargin) * 0.9) * (nFloors >= 2 ? g.tallGround : 1)), head: fan || gateway ? 'arched' : 'flat',
           crown: 'none', apron: false, sillConsoles: false,
         });
         continue;
@@ -990,7 +997,6 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
   const features = [
     STYLES[g.style].label,
     `${nFloors} floor${nFloors > 1 ? 's' : ''}${roofForm === 'mansard' ? ' + mansard attic' : ''}`,
-    `${n} bays × ${bayW.toFixed(2)} m`,
     comp === 'giant-portico'
       ? `Giant ${g.pairedColumns ? `coupled ${colCount}-column` : style(colCount)} ${orderName} portico with pediment`
       : comp === 'ground-portico'
@@ -1007,6 +1013,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
   if (plan === 'block' && avail > Dm + 1) features.push(`Block limited to ${Dm.toFixed(1)} m depth, garden behind`);
   if (wingBays) features.push(`End pavilions (${wingBays} bay${wingBays > 1 ? 's' : ''} each)${g.pavilionRoof === 'tall' ? ' with tall roofs' : ''}`);
   if (g.rusticatedGround) features.push('Rusticated ground floor');
+  if (g.tallGround > 1 && nFloors >= 2) features.push(`Tall ground floor (×${g.tallGround.toFixed(2)}) with taller windows`);
   if (g.corners !== 'none') features.push({ quoins: 'Corner quoins', pilasters: 'Corner pilasters', lesenes: 'Secession lesenes' }[g.corners]);
   features.push(`Window crowns: ${g.crown}${g.archedGround ? ', arched ground floor' : ''}`);
   const nets = balconies.filter((b) => b.id.startsWith('b-net')).length;
@@ -1057,6 +1064,11 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       stain: '#463e33',
       rust: '#7a4528',
       void: '#0d0e0f',
+      cardboard: '#a8875c',
+      sack: '#b9ad94',
+      crate: '#86684a',
+      binGreen: '#3d5a41',
+      binGrey: '#5e6266',
       cableDark: '#1b1c1e',
       cableGrey: '#77787a',
       cableWhite: '#d8d5cd',

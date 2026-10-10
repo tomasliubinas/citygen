@@ -422,6 +422,10 @@ function doorDetail(mb: MeshBuilder, o: OpeningSpec, out0: number, surround: Doo
   const zl1 = -0.28;
 
   mb.paint('door', () => {
+    // Backing plate behind the leaves (closes the meeting gap and any slit at the edges),
+    // plus a meeting stile in front of the gap between the two leaves.
+    mb.box(u0 - 0.02, o.sill, zl0 - 0.05, u1 + 0.02, top, zl0);
+    mb.box(o.u - 0.035, o.sill, zl1, o.u + 0.035, leafTop, zl1 + 0.03);
     for (const [lx0, lx1] of [[u0, o.u - 0.01], [o.u + 0.01, u1]]) {
       mb.box(lx0, o.sill, zl0, lx1, leafTop, zl1);
       const H = leafTop - o.sill;

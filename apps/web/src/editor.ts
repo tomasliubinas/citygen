@@ -12,9 +12,7 @@ interface Options {
 }
 
 type Drag =
-  | { mode: 'move'; start: [number, number]; orig: Rect; moved: boolean }
-  | { mode: 'resize'; l: boolean; r: boolean; t: boolean; b: boolean; orig: Rect; edge: WorldEdge | null; moved: boolean }
-  | { mode: 'draw'; anchor: [number, number] };
+  | { mode: 'resize'; l: boolean; r: boolean; t: boolean; b: boolean; orig: Rect; edge: WorldEdge | null; moved: boolean };
 
 const GRID = 2;
 const SNAP = 1;
@@ -28,7 +26,7 @@ export class PlanEditor {
   front: WorldEdge = 'south';
   private overlay: HouseSpec | null = null;
   private drag: Drag | null = null;
-  private hover: { cursor: string } = { cursor: 'crosshair' };
+  private hover: { cursor: string } = { cursor: 'default' };
   private ctx: CanvasRenderingContext2D;
   private size = 336;
 
@@ -39,6 +37,11 @@ export class PlanEditor {
     canvas.addEventListener('pointermove', (e) => this.move(e));
     canvas.addEventListener('pointerup', (e) => this.up(e));
     canvas.addEventListener('pointercancel', () => (this.drag = null));
+    // Only edges and corners are interactive: elsewhere a touch scrolls the page as usual.
+    canvas.addEventListener('touchstart', (e) => {
+      const t = e.touches[0];
+      if (e.touches.length === 1 && this.hit(this.toWorld(t), true).kind === 'edge') e.preventDefault();
+    }, { passive: false });
     this.resize();
   }
 
@@ -74,15 +77,15 @@ export class PlanEditor {
     const h = this.opts.extent / 2;
     return [(x + h) * this.scale, (z + h) * this.scale];
   }
-  private toWorld(e: PointerEvent): [number, number] {
+  private toWorld(e: { clientX: number; clientY: number }): [number, number] {
     const r = this.canvas.getBoundingClientRect();
     const h = this.opts.extent / 2;
     return [(e.clientX - r.left) / this.scale - h, (e.clientY - r.top) / this.scale - h];
   }
   private snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
-  private hit(p: [number, number]) {
-    const tol = 9 / this.scale;
+  private hit(p: [number, number], touch = false) {
+    const tol = (touch ? 18 : 9) / this.scale;
     const { x0, z0, x1, z1 } = this.rect;
     const nearX0 = Math.abs(p[0] - x0) < tol;
     const nearX1 = Math.abs(p[0] - x1) < tol;
@@ -104,12 +107,10 @@ export class PlanEditor {
   }
 
   private down(e: PointerEvent): void {
+    const h = this.hit(this.toWorld(e), e.pointerType === 'touch');
+    if (h.kind !== 'edge') return;
     this.canvas.setPointerCapture(e.pointerId);
-    const p = this.toWorld(e);
-    const h = this.hit(p);
-    if (h.kind === 'edge') this.drag = { mode: 'resize', l: h.l, r: h.r, t: h.t, b: h.b, orig: { ...this.rect }, edge: h.edge, moved: false };
-    else if (h.kind === 'inside') this.drag = { mode: 'move', start: p, orig: { ...this.rect }, moved: false };
-    else this.drag = { mode: 'draw', anchor: [this.snap(p[0]), this.snap(p[1])] };
+    this.drag = { mode: 'resize', l: h.l, r: h.r, t: h.t, b: h.b, orig: { ...this.rect }, edge: h.edge, moved: false };
   }
 
   private move(e: PointerEvent): void {
@@ -117,47 +118,23 @@ export class PlanEditor {
     if (!this.drag) {
       const h = this.hit(p);
       const cursor =
-        h.kind === 'inside' ? 'move'
-        : h.kind === 'edge' ? ((h.l || h.r) && (h.t || h.b) ? ((h.l && h.t) || (h.r && h.b) ? 'nwse-resize' : 'nesw-resize') : h.l || h.r ? 'ew-resize' : 'ns-resize')
-        : 'crosshair';
+        h.kind === 'edge' ? ((h.l || h.r) && (h.t || h.b) ? ((h.l && h.t) || (h.r && h.b) ? 'nwse-resize' : 'nesw-resize') : h.l || h.r ? 'ew-resize' : 'ns-resize')
+        : 'default';
       if (cursor !== this.hover.cursor) this.canvas.style.cursor = this.hover.cursor = cursor;
       return;
     }
     const { minSize, maxSize, extent } = this.opts;
     const half = extent / 2;
     const d = this.drag;
-    let next: Rect;
-    if (d.mode === 'move') {
-      const w = d.orig.x1 - d.orig.x0;
-      const h = d.orig.z1 - d.orig.z0;
-      const x0 = Math.min(half - w, Math.max(-half, this.snap(d.orig.x0 + p[0] - d.start[0])));
-      const z0 = Math.min(half - h, Math.max(-half, this.snap(d.orig.z0 + p[1] - d.start[1])));
-      next = { x0, z0, x1: x0 + w, z1: z0 + h };
-      if (x0 !== d.orig.x0 || z0 !== d.orig.z0) d.moved = true;
-    } else if (d.mode === 'resize') {
-      const o = d.orig;
-      const sx = this.snap(Math.max(-half, Math.min(half, p[0])));
-      const sz = this.snap(Math.max(-half, Math.min(half, p[1])));
-      next = { ...o };
-      if (d.l) next.x0 = Math.min(o.x1 - minSize, Math.max(o.x1 - maxSize, sx));
-      if (d.r) next.x1 = Math.max(o.x0 + minSize, Math.min(o.x0 + maxSize, sx));
-      if (d.t) next.z0 = Math.min(o.z1 - minSize, Math.max(o.z1 - maxSize, sz));
-      if (d.b) next.z1 = Math.max(o.z0 + minSize, Math.min(o.z0 + maxSize, sz));
-      if (next.x0 !== o.x0 || next.x1 !== o.x1 || next.z0 !== o.z0 || next.z1 !== o.z1) d.moved = true;
-    } else {
-      const [ax, az] = d.anchor;
-      const sx = this.snap(p[0]);
-      const sz = this.snap(p[1]);
-      const dirX = sx >= ax ? 1 : -1;
-      const dirZ = sz >= az ? 1 : -1;
-      const w = Math.min(maxSize, Math.max(minSize, Math.abs(sx - ax)));
-      const h = Math.min(maxSize, Math.max(minSize, Math.abs(sz - az)));
-      let x0 = dirX > 0 ? ax : ax - w;
-      let z0 = dirZ > 0 ? az : az - h;
-      x0 = Math.min(half - w, Math.max(-half, x0));
-      z0 = Math.min(half - h, Math.max(-half, z0));
-      next = { x0, z0, x1: x0 + w, z1: z0 + h };
-    }
+    const o = d.orig;
+    const sx = this.snap(Math.max(-half, Math.min(half, p[0])));
+    const sz = this.snap(Math.max(-half, Math.min(half, p[1])));
+    const next = { ...o };
+    if (d.l) next.x0 = Math.min(o.x1 - minSize, Math.max(o.x1 - maxSize, sx));
+    if (d.r) next.x1 = Math.max(o.x0 + minSize, Math.min(o.x0 + maxSize, sx));
+    if (d.t) next.z0 = Math.min(o.z1 - minSize, Math.max(o.z1 - maxSize, sz));
+    if (d.b) next.z1 = Math.max(o.z0 + minSize, Math.min(o.z0 + maxSize, sz));
+    if (next.x0 !== o.x0 || next.x1 !== o.x1 || next.z0 !== o.z0 || next.z1 !== o.z1) d.moved = true;
     if (next.x0 !== this.rect.x0 || next.x1 !== this.rect.x1 || next.z0 !== this.rect.z0 || next.z1 !== this.rect.z1) {
       this.rect = next;
       this.draw();
@@ -167,9 +144,10 @@ export class PlanEditor {
 
   private up(e: PointerEvent): void {
     const d = this.drag;
+    if (!d) return;
     this.drag = null;
     this.canvas.releasePointerCapture(e.pointerId);
-    if (d?.mode === 'resize' && !d.moved && d.edge) this.opts.onFront(d.edge);
+    if (!d.moved && d.edge) this.opts.onFront(d.edge);
   }
 
   draw(): void {

@@ -300,7 +300,56 @@ function curvedGable(mb: MeshBuilder, p: PedimentSpec): void {
     });
   }
   const zf = p.z;
-  mb.paint('wall', () => mb.extrude([[xc, by], [p.x0, by], ...pts, [p.x1, by]], zf - 0.6, zf));
+  // Window opening in the gable (arched light or oculus): bottom/top of the hole as functions of x.
+  const R = 0.2; // recess depth, like the façade windows
+  let hole: { x0: number; x1: number; bot: (x: number) => number; top: (x: number) => number } | null = null;
+  const gw = { ww: Math.min(1.4, Math.max(0.8, half * 0.45)), y0: by + 0.35, top: by + Math.min(H * 0.68, wr + (H - wr) * 0.6) };
+  const gSpring = gw.top - gw.ww / 2;
+  const oRad = Math.min(0.55, H * 0.17);
+  const oCy = by + H * 0.45;
+  if (p.shape !== 'tiered' && p.shape !== 'block') {
+    if (p.oculus) hole = { x0: xc - oRad, x1: xc + oRad, bot: (x) => oCy - Math.sqrt(Math.max(0, oRad * oRad - (x - xc) ** 2)), top: (x) => oCy + Math.sqrt(Math.max(0, oRad * oRad - (x - xc) ** 2)) };
+    else if (gSpring > gw.y0 + 0.4) hole = { x0: xc - gw.ww / 2, x1: xc + gw.ww / 2, bot: () => gw.y0, top: (x) => gSpring + Math.sqrt(Math.max(0, (gw.ww / 2) ** 2 - (x - xc) ** 2)) };
+  }
+  // Outline height at x (sampled just inside a strip, so vertical risers resolve cleanly).
+  const outline = [[p.x0, by] as Vec2, ...pts, [p.x1, by] as Vec2];
+  const topAt = (x: number) => {
+    for (let i = 0; i < outline.length - 1; i++) {
+      const [ax, ay] = outline[i];
+      const [bx, by2] = outline[i + 1];
+      const lo = Math.min(ax, bx);
+      const hi = Math.max(ax, bx);
+      if (hi - lo < 1e-6 || x < lo || x > hi) continue;
+      return ay + ((by2 - ay) * (x - ax)) / (bx - ax);
+    }
+    return by;
+  };
+  mb.paint('wall', () => {
+    // Solid back slab, then the front layer in vertical strips leaving the window opening.
+    mb.extrude(outline.length > 2 ? [[xc, by], ...outline] : outline, zf - 0.6, zf - R);
+    const xs = new Set<number>(outline.map(([x]) => x));
+    if (hole) for (let k = 0; k <= 12; k++) xs.add(hole.x0 + ((hole.x1 - hole.x0) * k) / 12);
+    for (let k = 0; k <= 24; k++) xs.add(p.x0 + ((p.x1 - p.x0) * k) / 24);
+    const cut = [...xs].filter((x) => x >= p.x0 - 1e-6 && x <= p.x1 + 1e-6).sort((a, b) => a - b);
+    const quad = (a: number, b: number, ya0: number, yb0: number, ya1: number, yb1: number) => {
+      if (Math.max(ya1 - ya0, yb1 - yb0) < 1e-3) return;
+      mb.extrude([[a, ya0], [b, yb0], [b, yb1], [a, ya1]], zf - R, zf);
+    };
+    for (let i = 0; i < cut.length - 1; i++) {
+      const a = cut[i];
+      const b = cut[i + 1];
+      if (b - a < 1e-4) continue;
+      const ta = topAt(a + 1e-4);
+      const tb = topAt(b - 1e-4);
+      const inHole = hole && a >= hole.x0 - 1e-6 && b <= hole.x1 + 1e-6;
+      if (!inHole) {
+        quad(a, b, by, by, ta, tb);
+        continue;
+      }
+      quad(a, b, by, by, hole!.bot(a), hole!.bot(b));
+      quad(a, b, hole!.top(a), hole!.top(b), ta, tb);
+    }
+  });
   // Coping following the outline.
   const zc = zf - 0.27;
   mb.paint('trim', () => {
@@ -329,17 +378,17 @@ function curvedGable(mb: MeshBuilder, p: PedimentSpec): void {
       mb.lathe([[0, 0], [0.1, 0], [0.06, 0.1], [0.13, 0.24], [0.05, 0.38], [0, 0.42]], 12),
     );
   });
-  // Gable window: oculus or a tall arched light, proud of the wall (none on a Deco attic).
+  // Gable window: oculus or a tall arched light, recessed like the façade windows (none on a Deco attic).
   if (p.shape === 'tiered' || p.shape === 'block') {
     // no window
   } else if (p.oculus) {
     const rad = Math.min(0.55, H * 0.17);
     const cy = by + H * 0.45;
     mb.paint('trim', () => mb.arcBand(xc, cy, rad, rad + 0.14, 0, Math.PI * 2, zf, zf + 0.08, 24));
-    mb.paint('glass', () => mb.extrude(circle(xc, cy, rad, 20), zf, zf + 0.02));
+    mb.paint('glass', () => mb.extrude(circle(xc, cy, rad, 20), zf - R, zf - R + 0.02));
     mb.paint('frame', () => {
-      mb.box(xc - rad, cy - 0.025, zf + 0.02, xc + rad, cy + 0.025, zf + 0.05);
-      mb.box(xc - 0.025, cy - rad, zf + 0.02, xc + 0.025, cy + rad, zf + 0.05);
+      mb.box(xc - rad, cy - 0.025, zf - R + 0.02, xc + rad, cy + 0.025, zf - R + 0.05);
+      mb.box(xc - 0.025, cy - rad, zf - R + 0.02, xc + 0.025, cy + rad, zf - R + 0.05);
     });
   } else {
     const ww = Math.min(1.4, Math.max(0.8, half * 0.45));
@@ -348,15 +397,15 @@ function curvedGable(mb: MeshBuilder, p: PedimentSpec): void {
     const spring = top - ww / 2;
     if (spring > y0 + 0.4) {
       mb.paint('glass', () => {
-        mb.box(xc - ww / 2, y0, zf, xc + ww / 2, spring, zf + 0.02);
-        mb.extrude(circle(xc, spring, ww / 2, 14, 0, Math.PI), zf, zf + 0.02);
+        mb.box(xc - ww / 2, y0, zf - R, xc + ww / 2, spring, zf - R + 0.02);
+        mb.extrude(circle(xc, spring, ww / 2, 14, 0, Math.PI), zf - R, zf - R + 0.02);
       });
       mb.paint('frame', () => {
-        mb.box(xc - 0.03, y0, zf + 0.02, xc + 0.03, top, zf + 0.05);
-        mb.box(xc - ww / 2, spring - 0.03, zf + 0.02, xc + ww / 2, spring + 0.03, zf + 0.05);
+        mb.box(xc - 0.03, y0, zf - R + 0.02, xc + 0.03, top, zf - R + 0.05);
+        mb.box(xc - ww / 2, spring - 0.03, zf - R + 0.02, xc + ww / 2, spring + 0.03, zf - R + 0.05);
         for (let k = 1; k < 4; k++) {
           const x = xc - ww / 2 + (ww * k) / 4;
-          mb.box(x - 0.012, spring, zf + 0.02, x + 0.012, spring + Math.sqrt(Math.max(0, (ww / 2) ** 2 - (x - xc) ** 2)), zf + 0.045);
+          mb.box(x - 0.012, spring, zf - R + 0.02, x + 0.012, spring + Math.sqrt(Math.max(0, (ww / 2) ** 2 - (x - xc) ** 2)), zf - R + 0.045);
         }
       });
       mb.paint('trim', () => {

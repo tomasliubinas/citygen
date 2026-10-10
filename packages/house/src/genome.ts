@@ -93,6 +93,8 @@ export interface ManorGenome {
   ashlar: boolean;
   /** Main-floor balcony spanning the whole risalit front (vs. the door bay only). */
   risalitBalcony: boolean;
+  /** Urban type: a markedly taller ground floor with taller windows (shops, lobbies, entresol). */
+  tallGround: number;
   /** Glazed-tile frieze under the eaves. */
   accentFrieze: boolean;
   endWings: boolean;
@@ -174,6 +176,7 @@ export interface StylePreset {
     groundCladding?: number;
     ashlar?: number;
     risalitBalcony?: number;
+    tallGround?: number;
   };
   colors: { wall: Weighted<string>; roof: Weighted<string>; frame: Weighted<string>; door: Weighted<string>; accent: Weighted<string>; trim?: Weighted<string>; stone?: Weighted<string> };
 }
@@ -217,6 +220,7 @@ export const CLASSICIST_MANOR: StylePreset = {
   balustrade: [['stone', 0.65], ['iron', 0.35]],
   dormers: [['none', 0.3], ['alternate', 0.45], ['all', 0.25]],
   chance: {
+    tallGround: 0.08,
     rusticatedGround: 0.6,
     archedGround: 0.4,
     endWings: 0.65,
@@ -268,6 +272,7 @@ export const BEAUX_ARTS: StylePreset = {
   balustrade: [['stone', 0.55], ['iron', 0.45]],
   dormers: [['all', 0.8], ['alternate', 0.2]],
   chance: {
+    tallGround: 0.4,
     rusticatedGround: 0.95,
     archedGround: 0.85,
     endWings: 0.85,
@@ -330,6 +335,7 @@ export const ART_NOUVEAU: StylePreset = {
   towerStages: [1, 1],
   maxFloors: null,
   chance: {
+    tallGround: 0.3,
     rusticatedGround: 0.25,
     archedGround: 0.45,
     endWings: 0,
@@ -392,6 +398,7 @@ export const KLAIPEDA: StylePreset = {
   windowHead: [['segmental', 0.7], ['flat', 0.3]],
   doorStyle: [['classical', 1]],
   chance: {
+    tallGround: 0.4,
     rusticatedGround: 0, archedGround: 0.8, endWings: 0.75, wingBalconies: 0, porticoBalcony: 0, fanlight: 1, oculus: 0.55,
     dentils: 0, pairedColumns: 0, parapet: 0, balconets: 0, cresting: 0, tower: 1, smallPanes: 0.8, accentFrieze: 0,
     rearTowers: 0, stringCourses: 0,
@@ -448,6 +455,7 @@ export const KAUNAS_DECO: StylePreset = {
   glazing: [['deco', 1]],
   balconetPattern: [['alternate', 0.35], ['ends', 0.25], ['center', 0.25], ['all', 0.15]],
   chance: {
+    tallGround: 0.65,
     rusticatedGround: 0.35, archedGround: 0, endWings: 0.4, wingBalconies: 0.6, porticoBalcony: 0, fanlight: 0, oculus: 0,
     dentils: 0, pairedColumns: 0, parapet: 0, balconets: 0.5, cresting: 0, tower: 0, smallPanes: 0, accentFrieze: 0.25,
     stringCourses: 1, entranceStrip: 0.65, flagpole: 0, decoBands: 0.45, portholes: 0.4, fluting: 0.35, groundCladding: 0.5,
@@ -499,6 +507,7 @@ export const VILNIUS_OLD_TOWN: StylePreset = {
   windowHead: [['flat', 1]],
   doorStyle: [['gateway', 1]],
   chance: {
+    tallGround: 0.25,
     rusticatedGround: 0.15, archedGround: 0.35, endWings: 0.2, wingBalconies: 0.2, porticoBalcony: 0, fanlight: 1, oculus: 0.5,
     dentils: 0.2, pairedColumns: 0, parapet: 0, balconets: 0.1, cresting: 0, tower: 0, smallPanes: 0.6, accentFrieze: 0,
   },
@@ -543,6 +552,7 @@ export const FRENCH_CLASSICAL: StylePreset = {
   doorStyle: [['lantern', 1]],
   balconetPattern: [['all', 0.75], ['ends', 0.25]],
   chance: {
+    tallGround: 0.6,
     rusticatedGround: 0, archedGround: 0.9, endWings: 0.2, wingBalconies: 0, porticoBalcony: 0, fanlight: 0.3, oculus: 0.3,
     dentils: 0.4, pairedColumns: 0, parapet: 0, balconets: 1, cresting: 0, tower: 0, smallPanes: 0, accentFrieze: 0,
     ashlar: 1,
@@ -623,6 +633,8 @@ export function createGenome(seed: string, styleId: StyleId = 'classicist-manor'
     groundCladding: r('ground-cladding').chance(p.chance.groundCladding ?? 0),
     ashlar: r('ashlar').chance(p.chance.ashlar ?? 0),
     risalitBalcony: r('risalit-balcony').chance(p.chance.risalitBalcony ?? 0.45),
+    // 1 = normal; otherwise the ground-floor height factor (1.25–1.4).
+    tallGround: r('tall-ground').chance(p.chance.tallGround ?? 0.1) ? r('tall-ground-k').range(1.25, 1.4) : 1,
     courtyard: r('courtyard').chance(0.5) ? 'closed' : 'open',
     roofPitch: range('roof-pitch', p.roofPitch),
     pedimentPitch: range('pediment-pitch', p.pedimentPitch),

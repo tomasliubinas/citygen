@@ -13,17 +13,21 @@
         <p class="sub">City generator · house layer · <a href="./city.html">open the city →</a></p>
       </header>
 
-      <section>
+      <section class="sec-plot">
         <div class="section-head">
-          <h2>Building envelope</h2>
+          <h2>Plot</h2>
           <span id="dims" class="dims"></span>
         </div>
         <canvas id="plan" class="plan"></canvas>
-        <p class="hint">Drag to draw · drag edges or corners to resize · drag inside to move · click an edge to make it the street front. Grid 2 m, snap 1 m.</p>
+        <p class="hint">Drag an edge or corner to resize · click an edge to make it the street front. Grid 2 m, snap 1 m.</p>
       </section>
 
-      <section>
+      <section class="sec-gen">
         <h2>Generator</h2>
+        <div class="row">
+          <label for="style">Style</label>
+          <select id="style"></select>
+        </div>
         <div class="row">
           <label for="seed">Seed</label>
           <div class="seed">
@@ -47,17 +51,6 @@
           </select>
         </div>
         <div class="row">
-          <label for="style">Style</label>
-          <select id="style"></select>
-        </div>
-        <div class="row">
-          <label>Party walls</label>
-          <div class="check">
-            <label class="check"><input id="pw-left" type="checkbox" /> left</label>
-            <label class="check"><input id="pw-right" type="checkbox" /> right</label>
-          </div>
-        </div>
-        <div class="row">
           <label for="wear">Wear</label>
           <select id="wear">
             <option value="auto">Auto (age + location)</option>
@@ -68,12 +61,19 @@
           </select>
         </div>
         <div class="row">
-          <label for="time">Time</label>
-          <select id="time"><option value="day">Day</option><option value="dusk">Dusk</option><option value="night">Night</option></select>
+          <label>Party walls</label>
+          <div class="check">
+            <label class="check"><input id="pw-left" type="checkbox" /> left</label>
+            <label class="check"><input id="pw-right" type="checkbox" /> right</label>
+          </div>
         </div>
         <div class="row">
           <label for="contract">Overlay</label>
           <label class="check"><input id="contract" type="checkbox" /> Interior — remove walls &amp; roof, show all floors</label>
+        </div>
+        <div class="row">
+          <label for="time">Time</label>
+          <select id="time"><option value="day">Day</option><option value="dusk">Dusk</option><option value="night">Night</option></select>
         </div>
       </section>
 

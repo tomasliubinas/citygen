@@ -2,6 +2,7 @@ import { generateCity, type CityPattern, type PlotSpec } from '@citygen/city';
 import { STYLES, type HouseSpec } from '@citygen/house';
 import { Minimap } from './minimap';
 import { CityView } from './view';
+import { addMoreCue } from '../render/more';
 
 interface State {
   seed: string;
@@ -180,6 +181,7 @@ view.onPick = (plot: PlotSpec | null, spec: HouseSpec | null) => {
     return;
   }
   box.hidden = false;
+  if (matchMedia('(max-width: 760px)').matches) requestAnimationFrame(() => box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   const styleLabel = STYLES[plot.style as keyof typeof STYLES]?.label ?? plot.style;
   const h = document.createElement('h3');
   h.textContent = `Plot ${plot.id} · ${styleLabel}`;
@@ -210,3 +212,5 @@ function tick(): void {
 labels();
 regenerate(true);
 tick();
+
+addMoreCue(document.querySelector<HTMLElement>('.panel')!);

@@ -1,4 +1,4 @@
-import { MeshBuilder, Rng } from '@citygen/core';
+import { MeshBuilder, Rng, rotationY, translation, mul } from '@citygen/core';
 import type { FacadeSpec, HouseSpec } from '../types';
 import { facadeFrame } from './facade';
 
@@ -11,6 +11,7 @@ import { facadeFrame } from './facade';
 export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
   const cond = spec.weathering.condition;
   buildRust(mb, spec, cond);
+  buildClutter(mb, spec, cond);
   buildCables(mb, spec, cond);
   // Fades in smoothly with wear: nothing on new houses, clear streaks on derelict ones.
   if (cond < 0.05) return;
@@ -52,7 +53,8 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
           const L = (0.35 + 1.15 * cond) * r.range(0.55, 1.15);
           const bottom = Math.max(top - L, spec.plinthHeight + 0.1);
           if (top - bottom < 0.15) continue;
-          const z = (o.sill < rustTop ? 0.035 : 0) + 0.02;
+          // In front of aprons (to 0.045) and rustication bands, never coplanar with them.
+          const z = (o.sill < rustTop ? 0.035 : 0) + 0.06;
           // A few soft drip streaks: alpha peaks on each streak's centre line and fades
           // to nothing at its sides and at its foot.
           const streaks = 3 + Math.floor(r.next() * 3);
@@ -77,9 +79,12 @@ export function buildWeathering(mb: MeshBuilder, spec: HouseSpec): void {
         const wallH = wallTop - spec.plinthHeight;
         const ca = 0.45 * cond;
         for (const end of [0, 1] as const) {
-          if (!main.has(fc) || !innerCorner(fc, end)) continue;
-          const u0 = end === 0 ? 0 : fc.length - 0.9;
-          const u1 = end === 0 ? 0.9 : fc.length;
+          // Short walls (risalit returns) skip it: the strip would stick out past the wall
+          // and float in front of the façade as a ghost "column".
+          if (!main.has(fc) || fc.length < 2 || !innerCorner(fc, end)) continue;
+          const gw = Math.min(0.9, fc.length / 2);
+          const u0 = end === 0 ? 0 : fc.length - gw;
+          const u1 = end === 0 ? gw : fc.length;
           const aL = end === 0 ? ca : 0;
           const aR = end === 0 ? 0 : ca;
           mb.quadAlpha([u0, spec.plinthHeight, zd], [u1, spec.plinthHeight, zd], [u1, spec.plinthHeight + wallH, zd], [u0, spec.plinthHeight + wallH, zd], [aL, aR, aR * 0.4, aL * 0.4]);
@@ -132,7 +137,8 @@ function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
     (f) => f.length > 5 && !(Math.abs(f.normal[0]) > 0.5 && ((pw.left && Math.abs(f.a[0] + halfW) < 1e-3) || (pw.right && Math.abs(f.a[0] - halfW) < 1e-3))),
   );
   const colours = ['cableDark', 'cableDark', 'cableGrey', 'cableWhite', 'cableBrown'];
-  const base = (spec.floors[1]?.elevation ?? spec.roof.eaveY - 0.9) - 0.32;
+  // Tucked right under the first-floor moulding (whose underside is ~0.17 below floor level).
+  const base = (spec.floors[1]?.elevation ?? spec.roof.eaveY - 1.1) - 0.23;
   const out = 0.045;
   walls.forEach((fc, wi) => {
     const rw = Rng.create(spec.input.seed, 'cables', fc.id);
@@ -142,7 +148,7 @@ function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
     const lines = 1 + (cond > 0.4 ? 1 : 0) + (cond > 0.7 && rw.chance(0.5) ? 1 : 0);
     mb.with(facadeFrame(fc), () => {
       for (let k = 0; k < lines; k++) {
-        const y = base - k * 0.09 - rw.range(0, 0.12);
+        const y = base - k * 0.07 - rw.range(0, 0.04);
         const u0 = 0.35 + k * 0.5;
         const u1 = fc.length - 0.35 - k * 0.5;
         if (u1 - u0 < 2) continue;
@@ -172,4 +178,143 @@ function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
     });
   });
   void r;
+}
+
+/**
+ * Back-yard clutter on worn houses: boxes, crates, bins, barrels, a leaning pallet — along the
+ * back wall, clear of the garden steps, inside the plot. None on clean houses.
+ */
+function buildClutter(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
+  const backs = spec.facades.filter((f) => f.side === 'back' && f.length > 4).sort((p, q) => q.length - p.length);
+  const fc = backs[0];
+  if (!fc) return;
+  const r = Rng.create(spec.input.seed, 'clutter');
+  // Amount scales with wall length: up to ~0.55 items per metre on a derelict house.
+  const n = Math.round(Math.pow(Math.max(0, cond - 0.15) / 0.85, 1.4) * 0.55 * fc.length);
+  if (n < 1) return;
+  const gs = spec.stairs.find((st) => st.role === 'garden');
+  const clear = gs ? [gs.x0 - gs.steps * 0.34 - 2.0, gs.x1 + gs.steps * 0.34 + 2.0] : [0, 0];
+  const dx = (fc.b[0] - fc.a[0]) / fc.length;
+  const maxOut = Math.max(0.6, Math.min(1.25, (fc.a[1] + spec.envelope.depth / 2) * Math.abs(fc.normal[1]) - 0.15));
+  // Junk gathers in heaps: 1–3 clusters, items touching in two rough rows, each heap
+  // leaning towards one kind (a row of bins, a pile of boxes and crates…).
+  // About one heap per 7 m of wall (fewer on less worn houses).
+  const clusters = Math.max(1, Math.round((fc.length / 7) * Math.min(1, 0.4 + cond)));
+  const kinds = [['box', 4], ['crate', 3], ['bin', 2], ['barrel', 2], ['pallet', 1.5], ['sack', 2], ['bucket', 1.5], ['planks', 1.5], ['tyres', 1]] as const;
+  const used: [number, number][] = [];
+  mb.with(facadeFrame(fc), () => {
+    for (let c = 0; c < clusters; c++) {
+      const per = Math.round(n / clusters + (r.next() - 0.5) * 2);
+      if (per < 1) continue;
+      let uc = 0;
+      for (let t = 0; t < 30; t++) {
+        uc = 2.5 + r.next() * Math.max(0, fc.length - 5);
+        const xw = fc.a[0] + dx * uc;
+        const span = per * 0.35;
+        if ((xw + span > clear[0] && xw - span < clear[1]) || used.some(([lo, hi]) => uc + span > lo && uc - span < hi)) { uc = -1; continue; }
+        break;
+      }
+      if (uc < 0) continue;
+      const fav = r.weighted(kinds);
+      let left = uc;
+      let right = uc;
+      const back: [number, number][] = [];
+      for (let k = 0; k < per; k++) {
+        const kind = r.chance(0.3) ? fav : r.weighted(kinds);
+        const wdt = kind === 'bin' ? 0.62 : kind === 'barrel' ? 0.6 : kind === 'pallet' ? 1.2 : kind === 'planks' ? 1.6 : kind === 'tyres' ? 0.65 : kind === 'bucket' ? 0.32 : 0.4 + r.next() * 0.35;
+        // Back row against the wall first; some items land in a front row, in front of the heap.
+        const front = k > 1 && kind !== 'pallet' && kind !== 'bin' && kind !== 'planks' && r.chance(0.35);
+        let u: number;
+        if (front && back.length) {
+          const [a0, a1] = back[Math.floor(r.next() * back.length)];
+          u = (a0 + a1) / 2 + (r.next() - 0.5) * 0.3;
+        } else if (k % 2 === 0) {
+          u = right + wdt / 2 + 0.03;
+          right = u + wdt / 2;
+        } else {
+          u = left - wdt / 2 - 0.03;
+          left = u - wdt / 2;
+        }
+        const xw = fc.a[0] + dx * u;
+        if (u < 1.5 || u > fc.length - 1.5 || (xw > clear[0] && xw < clear[1])) continue;
+        if (!front) back.push([u - wdt / 2, u + wdt / 2]);
+        // Leaning things stand 0.5 m out with their tops resting on the wall; the rest sit near it.
+        const out = kind === 'planks' ? 0.5 : Math.min(maxOut - wdt / 2, (front ? 0.85 : 0.18) + wdt / 2);
+        const turn = kind === 'planks' ? 0 : (r.next() - 0.5) * (front ? 0.8 : 0.3);
+        mb.with(mul(translation(u, 0, out), rotationY(turn)), () => clutterItem(mb, kind, wdt, r));
+      }
+      used.push([left - 0.6, right + 0.6]);
+    }
+  });
+}
+
+type Clutter = 'box' | 'crate' | 'bin' | 'barrel' | 'pallet' | 'sack' | 'bucket' | 'planks' | 'tyres';
+
+/** Simple-shaped junk: a few boxes / cylinders each, cheap and readable. */
+function clutterItem(mb: MeshBuilder, kind: Clutter, w: number, r: Rng): void {
+  const h2 = w / 2;
+  if (kind === 'box') {
+    // One to three cardboard boxes stacked, each smaller and a little askew.
+    const stack = 1 + Math.floor(r.next() * 3);
+    let y = 0;
+    let s = w;
+    mb.paint('cardboard', () => {
+      for (let k = 0; k < stack; k++) {
+        const hh = s * (0.6 + r.next() * 0.3);
+        mb.with(mul(translation((r.next() - 0.5) * 0.06, y, (r.next() - 0.5) * 0.06), rotationY((r.next() - 0.5) * 0.4)), () => mb.box(-s / 2, 0, -s * 0.4, s / 2, hh, s * 0.4));
+        y += hh;
+        s *= 0.8;
+      }
+    });
+  } else if (kind === 'crate') {
+    // Solid wooden crate with two darker bands.
+    const h = w * 0.75;
+    mb.paint('crate', () => mb.box(-h2, 0, -h2, h2, h, h2));
+    mb.paint('cardboard', () => {
+      for (const y of [h * 0.3, h * 0.7]) mb.box(-h2 - 0.01, y - 0.03, -h2 - 0.01, h2 + 0.01, y + 0.03, h2 + 0.01);
+    });
+  } else if (kind === 'bin') {
+    mb.paint(r.chance(0.5) ? 'binGreen' : 'binGrey', () => {
+      mb.box(-0.29, 0.04, -0.3, 0.29, 1.0, 0.3);
+      mb.box(-0.31, 1.0, -0.33, 0.31, 1.06, 0.33);
+    });
+  } else if (kind === 'barrel') {
+    mb.paint(r.chance(0.5) ? 'rust' : 'binGrey', () => mb.lathe([[0, 0], [0.29, 0], [0.3, 0.9], [0, 0.9]], 10));
+  } else if (kind === 'pallet') {
+    // Stacked pallets: each a flat deck on a slotted base.
+    const n = 2 + Math.floor(r.next() * 5);
+    mb.paint('crate', () => {
+      for (let k = 0; k < n; k++) {
+        const y = k * 0.145;
+        mb.with(mul(translation((r.next() - 0.5) * 0.05, y, (r.next() - 0.5) * 0.05), rotationY((r.next() - 0.5) * 0.08)), () => {
+          mb.box(-0.6, 0.1, -0.4, 0.6, 0.14, 0.4);
+          for (const x of [-0.55, 0, 0.55]) mb.box(x - 0.05, 0, -0.4, x + 0.05, 0.1, 0.4);
+        });
+      }
+    });
+  } else if (kind === 'sack') {
+    // Rubble / sand sacks: squat rounded lumps, sometimes two.
+    mb.paint('sack', () => {
+      const k = r.chance(0.5) ? 2 : 1;
+      for (let i = 0; i < k; i++) mb.with(translation(i * 0.3 - 0.15 * (k - 1), 0, 0), () => mb.lathe([[0, 0], [0.22, 0], [0.24, 0.12], [0.18, 0.28], [0, 0.3]], 8));
+    });
+  } else if (kind === 'bucket') {
+    mb.paint(r.chance(0.5) ? 'binGrey' : 'cardboard', () => mb.lathe([[0, 0], [0.12, 0], [0.16, 0.3], [0, 0.3]], 10));
+  } else if (kind === 'planks') {
+    // A few planks leaning against the wall.
+    mb.paint('crate', () => {
+      for (let i = 0; i < 3 + Math.floor(r.next() * 3); i++) {
+        const x = -0.7 + r.next() * 1.4;
+        // Foot out from the wall (+z), top resting against it (wall face at z = -0.5).
+        const foot = r.next() * 0.15;
+        mb.beam([x, 0, foot], [x + (r.next() - 0.5) * 0.3, 1.6 + r.next() * 0.6, -0.46], 0.04, 0.14, [0, 0, 1]);
+      }
+    });
+  } else {
+    // A stack of old tyres.
+    mb.paint('void', () => {
+      const n = 2 + Math.floor(r.next() * 3);
+      for (let i = 0; i < n; i++) mb.with(translation((r.next() - 0.5) * 0.05, i * 0.2, 0), () => mb.lathe([[0.15, 0], [0.32, 0], [0.32, 0.2], [0.15, 0.2], [0.15, 0]], 12));
+    });
+  }
 }

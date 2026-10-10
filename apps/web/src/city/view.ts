@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/controls/MapControls.js';
-import { addNavToggle } from '../render/nav';
+import { addNavHint } from '../render/nav';
+import { treeVariants } from '../render/trees';
 import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, stainMaterial, type Look, type TimeOfDay } from '../render/look';
 import type { CitySpec, PlotSpec } from '@citygen/city';
 import { buildHouseMesh, generateHouse, type HouseSpec } from '@citygen/house';
@@ -104,7 +105,7 @@ export class CityView {
     // Same mouse scheme as the house page: left = rotate, right (or Shift/Ctrl + left) = pan.
     this.controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
     this.controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
-    addNavToggle(container, this.controls as never);
+    addNavHint(container, this.controls as never);
     this.controls.enableDamping = true;
     this.controls.maxPolarAngle = Math.PI * 0.47;
     this.controls.minDistance = 15;
@@ -306,18 +307,34 @@ export class CityView {
       }
     }
     if (trees.length) {
-      const crown = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(3.2, 1), new THREE.MeshStandardMaterial({ color: '#5f7a4a', roughness: 1 }), trees.length);
-      const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.35, 4, 6), new THREE.MeshStandardMaterial({ color: '#5a4636', roughness: 1 }), trees.length);
+      // Detailed tree variants, one instanced crown + trunk mesh per variant.
+      const variants = treeVariants(3);
+      const crownMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true, side: THREE.DoubleSide });
+      const trunkMat = new THREE.MeshStandardMaterial({ color: '#5a4636', roughness: 1 });
       const m = new THREE.Matrix4();
-      trees.forEach((p, i) => {
-        const sc = 0.8 + ((i * 7919) % 100) / 250;
-        m.makeScale(sc, sc * 1.15, sc).setPosition(p.x, p.y + 5.5 * sc, p.z);
-        crown.setMatrixAt(i, m);
-        m.makeTranslation(p.x, p.y + 2, p.z);
-        trunk.setMatrixAt(i, m);
+      const q = new THREE.Quaternion();
+      variants.forEach((vg, vi) => {
+        const mine = trees.filter((_, i) => i % variants.length === vi);
+        if (!mine.length) return;
+        const crown = new THREE.InstancedMesh(vg.crown, crownMat, mine.length);
+        const trunk = new THREE.InstancedMesh(vg.trunk, trunkMat, mine.length);
+        mine.forEach((p, i) => {
+          // Per-tree variation from its position: full turn, slight lean, own proportions.
+          const h = (k: number) => {
+            const v = Math.sin(p.x * 12.9898 + p.z * 78.233 + k * 37.719) * 43758.5453;
+            return v - Math.floor(v);
+          };
+          const sc = 0.8 + h(1) * 0.5;
+          const e = new THREE.Euler((h(2) - 0.5) * 0.14, h(3) * Math.PI * 2, (h(4) - 0.5) * 0.14, 'YXZ');
+          q.setFromEuler(e);
+          m.compose(new THREE.Vector3(p.x, p.y, p.z), q, new THREE.Vector3(sc * (0.85 + h(5) * 0.3), sc * (0.85 + h(6) * 0.35), sc * (0.85 + h(7) * 0.3)));
+          crown.setMatrixAt(i, m);
+          trunk.setMatrixAt(i, m);
+        });
+        crown.castShadow = trunk.castShadow = true;
+        crown.receiveShadow = true;
+        this.ground.add(crown, trunk);
       });
-      crown.castShadow = trunk.castShadow = true;
-      this.ground.add(crown, trunk);
     }
     for (const b of city.blocks) {
       if (b.kind !== 'plaza') continue;
