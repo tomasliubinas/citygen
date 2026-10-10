@@ -1,8 +1,10 @@
+import * as THREE from 'three';
 import { buildHouseMesh, generateHouse, MAX_ENVELOPE, MIN_ENVELOPE, STYLES, type HouseSpec, type StyleId, type WorldEdge } from '@citygen/house';
 import { buildInteriorMesh, planInterior, type InteriorSpec } from '@citygen/interior';
 import { PlanEditor, type Rect } from './editor';
 import { cameraFromHash, cameraToHash, onCameraSettled } from './render/camera-hash';
 import { addMoreCue } from './render/more';
+import { autoOrbit } from './render/orbit';
 import { HouseViewer } from './viewer';
 
 interface State {
@@ -161,7 +163,35 @@ const DEFAULT_CAM = '51.7,9.9,40.0,6.7,8.0,-0.0';
 const hashAtLoad = new URLSearchParams(location.hash.slice(1));
 const initialCam = hashAtLoad.get('cam') ?? (hashAtLoad.has('seed') ? null : DEFAULT_CAM);
 let camRestored = false;
-onCameraSettled(viewer.controls, () => writeCam());
+// Opening without a saved camera (default view, or a house opened from the city): an
+// orbit around the back door, gliding there from the opening view; it pauses while the
+// user handles the camera and resumes, a little slower, after a few idle seconds.
+let orbitBase: { radius: number } | null = null;
+const orbit = hashAtLoad.has('cam')
+  ? null
+  : autoOrbit(viewer.controls, viewer.camera, () => {
+      const door = current?.facades.flatMap((f) => f.openings).find((o) => o.kind === 'garden-door');
+      if (!current || !door || !camRestored) return null;
+      // Keep the current zoom (the opening view's distance, or wherever the user left it);
+      // the camera circles at about 5th-floor height.
+      orbitBase ??= { radius: viewer.camera.position.distanceTo(viewer.controls.target) };
+      const { x, z, rotationY } = current.placement;
+      const c = Math.cos(rotationY);
+      const sn = Math.sin(rotationY);
+      const [lx, , lz] = door.position;
+      const pivot = new THREE.Vector3(x + lx * c + lz * sn, current.floors[1]?.elevation ?? 5, z - lx * sn + lz * c);
+      const camY = current.floors[0].elevation + 4 * 3.7 + 1.6;
+      const elevation = Math.asin(Math.max(-0.9, Math.min(0.9, (camY - pivot.y) / orbitBase.radius)));
+      return { pivot, radius: orbitBase.radius, elevation };
+    }, {
+      speed: -1.18, resumeSpeed: -0.91, idleMs: 15000,
+      onResume: () => (orbitBase = { radius: viewer.camera.position.distanceTo(viewer.controls.target) }),
+    });
+// Editing never stops the orbit; while paused, it restarts the 15 s wait.
+for (const ev of ['input', 'change', 'pointerdown']) document.querySelector('.panel')!.addEventListener(ev, () => orbit?.poke());
+onCameraSettled(viewer.controls, () => {
+  if (!orbit?.active) writeCam();
+});
 function writeCam(): void {
   const p = new URLSearchParams(location.hash.slice(1));
   p.set('cam', cameraToHash(viewer.camera, viewer.controls.target));

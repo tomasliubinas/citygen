@@ -473,7 +473,9 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
         // A tall ground floor gets proportionally taller windows.
         // Ground-floor windows are never shorter than the main-floor windows above.
         const mainH = g.glazing === 'deco' ? winW * Math.max(g.windowRatio * 1.35, 1.75) : winW * g.windowRatio * 1.1;
-        return plain({ sill: e + 0.95, height: Math.min(Math.max(winW * g.windowRatio * 1.1, mainH) * g.tallGround, H - 0.95 - 0.8), head, crown, apron: single && primary, sillConsoles: single && primary });
+        // Taller than the main floor → windows taller in proportion (always, not only for tall-ground styles).
+        const k = nFloors >= 2 ? Math.max(g.tallGround, H / g.floorHeights.main) : g.tallGround;
+        return plain({ sill: e + 0.95, height: Math.min(Math.max(winW * g.windowRatio * 1.1, mainH) * k, H - 0.95 - 0.8), head, crown, apron: single && primary, sillConsoles: single && primary });
       }
       case 'main':
         return plain({
@@ -514,6 +516,13 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
 
   // Front facade(s): every bay on every floor; door on the axis.
   const stairBay = g.stairSide === 'right' ? Math.min(n - 1, mid + 1) : Math.max(0, mid - 1);
+  /** Half-landing windows: head a little above the windows of the floor below (not up at the next floor). */
+  const stairSill = (below: FloorSpec, h: number) => {
+    const w = windowFor(below, 1, false);
+    return Math.max(below.elevation + below.height / 2 + 0.1, w.sill + w.height + 0.25 - h);
+  };
+  /** Side entrances: a generous double door, wider than the windows beside it. */
+  const sideDoorW = clamp(winW + 0.35, 1.6, 1.9);
   /** Secondary ground-floor doors: at least `min`, up to the window heads, never into the floor above. */
   const groundDoorHeight = (f: FloorSpec, min: number) => {
     const w = windowFor(f, 1, false);
@@ -572,10 +581,10 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     if (hasStair && i === stairBay && i !== mid) {
       for (let f = 1; f < nFloors; f++) {
         const below = floors[f - 1];
-        const landing = below.elevation + below.height / 2;
+        const sh = Math.min(1.35, below.height / 2 - 0.65);
         addOpening(back, {
-          kind: 'stair-window', floor: f, u, sill: landing + 0.5, width: winW * 0.85,
-          height: Math.min(1.35, below.height / 2 - 0.65), head: g.archedGround ? 'arched' : 'flat',
+          kind: 'stair-window', floor: f, u, sill: stairSill(below, sh), width: winW * 0.85,
+          height: sh, head: g.archedGround ? 'arched' : 'flat',
           crown: 'none', apron: false, sillConsoles: false,
         });
       }
@@ -665,12 +674,11 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       const u = horizontal ? Math.abs(cnd.p - fc.a[0]) : Math.abs(cnd.p - fc.a[1]);
       if (cnd.stair) {
         // Wing staircase: entrance door from the courtyard, half-landing windows above.
-        const doorWw = 1.3;
-        addOpening(fc, { kind: 'door', floor: 0, u, sill: floors[0].elevation, width: doorWw, height: groundDoorHeight(floors[0], Math.min(floors[0].height - 1.0, 2.9)), head: g.archedGround ? 'arched' : 'flat', crown: 'none', apron: false, sillConsoles: false, surround: 'portico' });
+        addOpening(fc, { kind: 'door', floor: 0, u, sill: floors[0].elevation, width: sideDoorW, height: groundDoorHeight(floors[0], Math.min(floors[0].height - 1.0, 2.9)), head: g.archedGround ? 'arched' : 'flat', crown: 'none', apron: false, sillConsoles: false, surround: 'portico' });
         for (let f = 1; f < nFloors; f++) {
           const below = floors[f - 1];
-          const landing = below.elevation + below.height / 2;
-          addOpening(fc, { kind: 'stair-window', floor: f, u, sill: landing + 0.5, width: winW * 0.85, height: Math.min(1.35, below.height / 2 - 0.65), head: g.archedGround ? 'arched' : 'flat', crown: 'none', apron: false, sillConsoles: false });
+          const sh = Math.min(1.35, below.height / 2 - 0.65);
+          addOpening(fc, { kind: 'stair-window', floor: f, u, sill: stairSill(below, sh), width: winW * 0.85, height: sh, head: g.archedGround ? 'arched' : 'flat', crown: 'none', apron: false, sillConsoles: false });
         }
         const run = steps * TREAD;
         wingStairs.push({ id: `s-${cnd.wing}`, role: 'entrance', x0: u - 1.2, x1: u + 1.2, zStart: 0, zEnd: run + 0.9, landing: 0.9, fromY: 0, toY: plinth, steps, direction: 'front', railing: g.balustrade === 'stone' ? 'iron' : g.balustrade, pedestals: false, facadeId: fc.id });
@@ -680,7 +688,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
         // Outer walls stand close to the plot edge: the steps may reach past it (an accepted
         // exception to the envelope rule — a door without steps looks wrong).
         const run = steps * TREAD;
-        addOpening(fc, { kind: 'door', floor: 0, u, sill: floors[0].elevation, width: 1.3, height: groundDoorHeight(floors[0], Math.min(floors[0].height - 1.0, 2.9)), head: g.archedGround ? 'arched' : 'flat', crown: 'none', apron: false, sillConsoles: false, surround: 'portico' });
+        addOpening(fc, { kind: 'door', floor: 0, u, sill: floors[0].elevation, width: sideDoorW, height: groundDoorHeight(floors[0], Math.min(floors[0].height - 1.0, 2.9)), head: g.archedGround ? 'arched' : 'flat', crown: 'none', apron: false, sillConsoles: false, surround: 'portico' });
         for (const f of floors.slice(1)) addOpening(fc, { kind: 'window', floor: f.index, u, width: winW, ...windowFor(f, 1, false) });
         wingStairs.push({ id: `s-${cnd.wing}-out`, role: 'entrance', x0: u - 1.2, x1: u + 1.2, zStart: 0, zEnd: run + 0.9, landing: 0.9, fromY: 0, toY: plinth, steps, direction: 'front', railing: g.balustrade === 'stone' ? 'iron' : g.balustrade, pedestals: false, facadeId: fc.id });
         continue;

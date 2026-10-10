@@ -141,11 +141,36 @@ function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
   // Tucked right under the first-floor moulding (whose underside is ~0.17 below floor level).
   const base = (spec.floors[1]?.elevation ?? spec.roof.eaveY - 1.1) - 0.23;
   const out = 0.045;
-  walls.forEach((fc, wi) => {
+  // Which walls carry cables (the street front always, others with rising odds).
+  const frontWall = walls.filter((f) => f.side === 'front').sort((p, q) => q.length - p.length)[0];
+  const cabled = walls.filter((fc) => {
     const rw = Rng.create(spec.input.seed, 'cables', fc.id);
-    // The street front always gets cables once they appear; other walls with rising odds.
-    const front = fc.side === 'front' && fc === walls.filter((f) => f.side === 'front').sort((p, q) => q.length - p.length)[0];
-    if (!front && !rw.chance(0.25 + 0.6 * cond)) return;
+    // Side walls (left/right of the house) carry the feed in from the street: likelier than back walls.
+    const side = fc.side === 'left' || fc.side === 'right';
+    return fc === frontWall || rw.chance((side ? 0.55 : 0.25) + 0.6 * cond);
+  });
+  // One feed per house: it drops to the junction box on a side wall near the street corner
+  // (the front only if no side wall has cables).
+  const feedWall = cabled.filter((f) => f.side === 'left' || f.side === 'right').sort((p, q) => q.length - p.length)[0] ?? frontWall;
+  walls.forEach((fc, wi) => {
+    if (!cabled.includes(fc)) return;
+    const rw = Rng.create(spec.input.seed, 'cables', fc.id);
+    rw.next();
+    // The feed drops to a junction box near one corner, in a clear strip of wall: never
+    // across a window or door, never behind a pilaster.
+    const blocked = (u: number, m: number) =>
+      fc.openings.some((o) => Math.abs(o.u - u) < o.width / 2 + 0.25 + m) ||
+      spec.pilasters.some((pl) => pl.facadeId === fc.id && Math.abs(pl.u - u) < pl.width / 2 + 0.12 + m);
+    // Near the street-side corner of a side wall.
+    const atStart = fc.side === 'front' ? rw.chance(0.5) : (fc.a[1] > fc.b[1]);
+    let drop: number | null = null;
+    for (let d = 0.7; fc === feedWall && d < Math.min(4, fc.length / 2); d += 0.1) {
+      const u = atStart ? d : fc.length - d;
+      if (!blocked(u, 0.2)) {
+        drop = u;
+        break;
+      }
+    }
     const lines = 1 + (cond > 0.4 ? 1 : 0) + (cond > 0.7 && rw.chance(0.5) ? 1 : 0);
     mb.with(facadeFrame(fc), () => {
       for (let k = 0; k < lines; k++) {
@@ -164,15 +189,29 @@ function buildCables(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
             mb.box(a0 - 0.02, y - 0.03, 0, a0 + 0.02, y + 0.03, out + 0.01);
           }
           // The first line drops down a corner to a junction box.
-          if (k === 0) {
-            const ud = rw.chance(0.5) ? u0 : u1;
-            mb.beam([ud, y, out], [ud, spec.plinthHeight + 0.3, out], 0.022, 0.022);
+          if (k === 0 && drop !== null) mb.beam([drop, y, out], [drop, spec.plinthHeight + 0.74, out], 0.022, 0.022);
+          // Older houses: branch lines run down beside a window and end near its sill
+          // (a later feed into that flat).
+          if (cond > 0.45) {
+            const wins = fc.openings.filter((o) => o.floor === 0 && o.kind === 'window' && o.sill + o.height < y - 0.3);
+            const want = 0.7 * Math.round(wins.length * (cond - 0.45) * 0.8 + (rw.chance(0.5) ? 0.5 : 0));
+            const picked = wins.filter(() => rw.chance(want / Math.max(1, wins.length)));
+            for (const o of picked) {
+              const side = rw.chance(0.5) ? -1 : 1;
+              const ub = o.u + side * (o.width / 2 + 0.24 + k * 0.05);
+              if (ub < u0 || ub > u1 || blocked(ub, -0.24)) continue;
+              const yEnd = o.sill + rw.range(0.05, 0.35);
+              mb.beam([ub, y, out], [ub, yEnd, out], 0.02, 0.02);
+              for (let yc = y - 0.6; yc > yEnd + 0.2; yc -= 0.6) mb.box(ub - 0.03, yc - 0.02, 0, ub + 0.03, yc + 0.02, out + 0.01);
+            }
           }
         });
-        if (k === 0) {
+        if (k === 0 && drop !== null) {
+          const ud = drop;
           mb.paint('metal', () => {
-            const ud = rw.chance(0.5) ? u0 : u1;
-            mb.box(ud - 0.14, spec.plinthHeight + 0.4, 0, ud + 0.14, spec.plinthHeight + 0.75, 0.09);
+            // Junction box with a lid lip; the drop enters it from above.
+            mb.box(ud - 0.16, spec.plinthHeight + 0.3, 0, ud + 0.16, spec.plinthHeight + 0.72, 0.1);
+            mb.box(ud - 0.18, spec.plinthHeight + 0.7, 0, ud + 0.18, spec.plinthHeight + 0.76, 0.12);
           });
         }
       }

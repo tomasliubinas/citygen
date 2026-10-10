@@ -23,6 +23,9 @@ const SNAP = 1;
  * 2D envelope editor. Knows nothing about how houses are generated — it only
  * edits a rectangle and a front edge, and draws an optional footprint overlay.
  */
+/** Plan canvas height / width. */
+const ASPECT = 0.75;
+
 export class PlanEditor {
   rect: Rect = { x0: -14, z0: -9, x1: 14, z1: 9 };
   front: WorldEdge = 'south';
@@ -32,6 +35,7 @@ export class PlanEditor {
   private hover: { cursor: string } = { cursor: 'default' };
   private ctx: CanvasRenderingContext2D;
   private size = 336;
+  private height = 252;
 
   constructor(private canvas: HTMLCanvasElement, private opts: Options) {
     this.ctx = canvas.getContext('2d')!;
@@ -68,8 +72,9 @@ export class PlanEditor {
     const css = this.canvas.clientWidth || 336;
     const dpr = window.devicePixelRatio || 1;
     this.size = css;
+    this.height = css * ASPECT;
     this.canvas.width = Math.round(css * dpr);
-    this.canvas.height = Math.round(css * dpr);
+    this.canvas.height = Math.round(this.height * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.draw();
   }
@@ -77,14 +82,18 @@ export class PlanEditor {
   private get scale() {
     return this.size / this.opts.extent;
   }
+  /** Half the shown depth (z): the canvas is wider than tall. */
+  private get halfZ() {
+    return (this.opts.extent * ASPECT) / 2;
+  }
   private toPx(x: number, z: number): [number, number] {
     const h = this.opts.extent / 2;
-    return [(x + h) * this.scale, (z + h) * this.scale];
+    return [(x + h) * this.scale, (z + this.halfZ) * this.scale];
   }
   private toWorld(e: { clientX: number; clientY: number }): [number, number] {
     const r = this.canvas.getBoundingClientRect();
     const h = this.opts.extent / 2;
-    return [(e.clientX - r.left) / this.scale - h, (e.clientY - r.top) / this.scale - h];
+    return [(e.clientX - r.left) / this.scale - h, (e.clientY - r.top) / this.scale - this.halfZ];
   }
   private snap = (v: number) => Math.round(v / SNAP) * SNAP;
 
@@ -135,18 +144,19 @@ export class PlanEditor {
     }
     const { minSize, maxSize, extent } = this.opts;
     const half = extent / 2;
+    const halfZ = this.halfZ;
     const d = this.drag;
     const o = d.orig;
     if (d.mode === 'move') {
       const w = o.x1 - o.x0;
       const h = o.z1 - o.z0;
       const x0 = Math.min(half - w, Math.max(-half, this.snap(o.x0 + p[0] - d.start[0])));
-      const z0 = Math.min(half - h, Math.max(-half, this.snap(o.z0 + p[1] - d.start[1])));
+      const z0 = Math.min(halfZ - h, Math.max(-halfZ, this.snap(o.z0 + p[1] - d.start[1])));
       this.apply({ x0, z0, x1: x0 + w, z1: z0 + h });
       return;
     }
     const sx = this.snap(Math.max(-half, Math.min(half, p[0])));
-    const sz = this.snap(Math.max(-half, Math.min(half, p[1])));
+    const sz = this.snap(Math.max(-halfZ, Math.min(halfZ, p[1])));
     const next = { ...o };
     if (d.l) next.x0 = Math.min(o.x1 - minSize, Math.max(o.x1 - maxSize, sx));
     if (d.r) next.x1 = Math.max(o.x0 + minSize, Math.min(o.x0 + maxSize, sx));
@@ -175,10 +185,11 @@ export class PlanEditor {
   draw(): void {
     const ctx = this.ctx;
     const S = this.size;
+    const SH = this.height;
     const { extent } = this.opts;
-    ctx.clearRect(0, 0, S, S);
+    ctx.clearRect(0, 0, S, SH);
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, S, S);
+    ctx.fillRect(0, 0, S, SH);
 
     // Grid: 2 m minor, 10 m major.
     for (let v = -extent / 2; v <= extent / 2; v += GRID) {
@@ -189,7 +200,7 @@ export class PlanEditor {
       const [, pz] = this.toPx(0, v);
       ctx.beginPath();
       ctx.moveTo(Math.round(px) + 0.5, 0);
-      ctx.lineTo(Math.round(px) + 0.5, S);
+      ctx.lineTo(Math.round(px) + 0.5, SH);
       ctx.moveTo(0, Math.round(pz) + 0.5);
       ctx.lineTo(S, Math.round(pz) + 0.5);
       ctx.stroke();
@@ -204,8 +215,8 @@ export class PlanEditor {
     const band = 6 * this.scale;
     if (this.front === 'south') ctx.fillRect(0, bz, S, band);
     if (this.front === 'north') ctx.fillRect(0, az - band, S, band);
-    if (this.front === 'east') ctx.fillRect(bx, 0, band, S);
-    if (this.front === 'west') ctx.fillRect(ax - band, 0, band, S);
+    if (this.front === 'east') ctx.fillRect(bx, 0, band, SH);
+    if (this.front === 'west') ctx.fillRect(ax - band, 0, band, SH);
 
     ctx.fillStyle = 'rgba(58,61,66,0.05)';
     ctx.fillRect(ax, az, bx - ax, bz - az);
@@ -403,7 +414,7 @@ export class PlanEditor {
     const S = this.size;
     const outside = (paths: () => void) => {
       ctx.beginPath();
-      ctx.rect(0, 0, S, S);
+      ctx.rect(0, 0, S, this.height);
       paths();
       ctx.clip('evenodd');
     };

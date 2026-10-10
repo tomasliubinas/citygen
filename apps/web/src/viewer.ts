@@ -155,7 +155,7 @@ export class HouseViewer {
   }
 
   /** Sun (and its shadow frustum) relative to the house; the sky's sun glow follows. */
-  private placeSun(spec: HouseSpec): void {
+  private placeSun(spec: HouseSpec, bake = true): void {
     const r = Math.max(spec.envelope.width, spec.envelope.depth);
     const s = this.sun.shadow.camera;
     s.left = s.bottom = -r * 0.95;
@@ -166,7 +166,7 @@ export class HouseViewer {
     const sunLocal = new THREE.Vector3(-r * 1.3, r * 1.5 * this.sunElevation, r * 1.1).applyAxisAngle(new THREE.Vector3(0, 1, 0), spec.placement.rotationY);
     this.sun.position.set(spec.placement.x + sunLocal.x, sunLocal.y, spec.placement.z + sunLocal.z);
     const key = `${spec.placement.rotationY}|${this.sunElevation}`;
-    if (key !== this.sunKey) {
+    if (bake && key !== this.sunKey) {
       this.sunKey = key;
       this.look.setSun(sunLocal.clone());
     }
@@ -176,13 +176,15 @@ export class HouseViewer {
 
   /** Day / dusk / night: sky, light and lit windows. */
   setTime(t: TimeOfDay): void {
-    const p = this.look.setTime(t);
-    this.sun.color.set(p.sunColor);
-    this.sun.intensity = p.sunIntensity;
-    this.hemi.intensity = p.hemiIntensity;
-    this.sunElevation = p.sunElevation;
-    this.sunKey = '';
-    if (this.lastSpec) this.placeSun(this.lastSpec);
+    this.look.setTime(t, (p, done) => {
+      this.sun.color.set(p.sunColor);
+      this.sun.intensity = p.sunIntensity;
+      this.hemi.intensity = p.hemiIntensity;
+      this.sunElevation = p.sunElevation;
+      // The light moves every frame; the sky reflection is re-baked only at the end.
+      if (done) this.sunKey = '';
+      if (this.lastSpec) this.placeSun(this.lastSpec, done);
+    });
   }
 
   /** Camera presets relative to the entrance facade (azimuth 0 = straight at the front). */
@@ -334,6 +336,8 @@ export class HouseViewer {
     gm.transparent = see;
     gm.opacity = see ? 0.2 : 1;
     gm.depthWrite = !see;
+    // Opaque/transparent compile differently (OPAQUE forces alpha 1): recompile on change.
+    gm.needsUpdate = true;
     for (const o of this.site.children) {
       const mm = (o as THREE.Mesh).material as THREE.Material;
       mm.transparent = see;

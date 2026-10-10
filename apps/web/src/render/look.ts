@@ -318,8 +318,11 @@ function makeSky(radius: number): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderM
 
 export interface Look {
   sky: THREE.Mesh;
-  /** Switch sky, environment, fog, exposure and window lights; the caller applies sun/hemisphere values. */
-  setTime(t: TimeOfDay): TimePreset;
+  /**
+   * Switch sky, environment, fog, exposure and window lights, blending over ~3 s; `apply`
+   * gets the blended preset each frame (sun/hemisphere values are the caller's).
+   */
+  setTime(t: TimeOfDay, apply?: (p: TimePreset, done: boolean) => void): TimePreset;
   setSize(w: number, h: number): void;
   render(): void;
   /** Direction towards the sun (world). */
@@ -346,6 +349,10 @@ export function createLook(
   envScene.add(envSky);
   let envRT: THREE.WebGLRenderTarget | null = null;
   let envIntensity = 0.5;
+  let shown: TimePreset | null = null;
+  let timeRun = 0;
+  let lastBake = 0;
+  const now = () => performance.now();
 
   // Multisampled HDR target: keeps edges smooth now that rendering goes through post-processing.
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 }));
@@ -366,21 +373,39 @@ export function createLook(
     render() {
       composer.render();
     },
-    setTime(t) {
-      const p = TIMES[t];
-      for (const m of [sky.material, envSky.material]) {
-        m.uniforms.uZenith.value.set(p.zenith);
-        m.uniforms.uHorizon.value.set(p.horizon);
-        m.uniforms.uGround.value.set(p.ground);
-      }
-      if (scene.fog) (scene.fog as THREE.FogExp2).color.set(p.fog);
-      renderer.toneMappingExposure = p.exposure;
-      envIntensity = p.env;
-      lookGlobals.night.value = p.night;
-      this.setSun(sky.material.uniforms.uSun.value.clone());
-      return p;
+    setTime(t, apply) {
+      // Blend from what is on screen now to the new preset over ~3 s (instant the first time).
+      const to = TIMES[t];
+      const from = shown;
+      const t0 = performance.now();
+      const dur = from ? 3000 : 0;
+      const run = ++timeRun;
+      const frame = () => {
+        if (run !== timeRun) return;
+        const k = dur ? Math.min(1, (performance.now() - t0) / dur) : 1;
+        const e = k * k * (3 - 2 * k);
+        const p = from ? mixPreset(from, to, e) : to;
+        shown = p;
+        for (const m of [sky.material, envSky.material]) {
+          m.uniforms.uZenith.value.set(p.zenith);
+          m.uniforms.uHorizon.value.set(p.horizon);
+          m.uniforms.uGround.value.set(p.ground);
+        }
+        if (scene.fog) (scene.fog as THREE.FogExp2).color.set(p.fog);
+        renderer.toneMappingExposure = p.exposure;
+        envIntensity = p.env;
+        scene.environmentIntensity = envIntensity;
+        lookGlobals.night.value = p.night;
+        apply?.(p, k >= 1);
+        // The sky reflection is re-baked a few times during the blend, not every frame.
+        if (k >= 1 || now() - lastBake > 300) this.setSun(sky.material.uniforms.uSun.value.clone());
+        if (k < 1) requestAnimationFrame(frame);
+      };
+      frame();
+      return to;
     },
     setSun(dir) {
+      lastBake = now();
       const d = dir.clone().normalize();
       sky.material.uniforms.uSun.value.copy(d);
       envSky.material.uniforms.uSun.value.copy(d);
@@ -496,7 +521,10 @@ export function glassMaterial(): THREE.MeshStandardMaterial {
         float top = smoothstep(-0.6, 0.9, fract(hgt / 3.8 + 0.15) - 0.5);
         vec3 refl = skyR * fres * (0.55 + 0.12 * top);
         totalEmissiveRadiance += refl * (1.0 - curtain * 0.5) * (1.0 - uNight) * (1.0 - 0.45 * wwear);
-        float wlit = step(wr, uLit) * uNight * (1.0 - boarded);
+        // Which windows are lit: a random share, smaller on worn houses (empty flats); each one
+        // switches on at its own point as night falls, so lights come on one by one.
+        float onAt = 0.08 + 0.85 * fract(wr * 41.3 + 0.17);
+        float wlit = step(wr, uLit * (1.0 - 0.45 * wwear)) * smoothstep(onAt, onAt + 0.04, uNight) * mix(0.6, 1.0, uNight) * (1.0 - boarded);
         vec3 lamp = mix(vec3(1.0, 0.62, 0.3), vec3(1.0, 0.78, 0.5), wr2);
         totalEmissiveRadiance += lamp * wlit * (0.38 + 0.42 * wr2) * mix(1.0, 0.8, curtain);`);
   };
@@ -514,9 +542,21 @@ export interface TimePreset {
   exposure: number; env: number; night: number;
 }
 
+function mixPreset(a: TimePreset, b: TimePreset, k: number): TimePreset {
+  const c = (x: string, y: string) => `#${new THREE.Color(x).lerp(new THREE.Color(y), k).getHexString()}`;
+  const n = (x: number, y: number) => x + (y - x) * k;
+  return {
+    zenith: c(a.zenith, b.zenith), horizon: c(a.horizon, b.horizon), ground: c(a.ground, b.ground), fog: c(a.fog, b.fog),
+    sunColor: c(a.sunColor, b.sunColor), sunIntensity: n(a.sunIntensity, b.sunIntensity), hemiIntensity: n(a.hemiIntensity, b.hemiIntensity),
+    sunElevation: n(a.sunElevation, b.sunElevation), exposure: n(a.exposure, b.exposure), env: n(a.env, b.env), night: n(a.night, b.night),
+  };
+}
+
 export const TIMES: Record<TimeOfDay, TimePreset> = {
+  // Night: the sun keeps sinking to the horizon and fades out (shadows lengthen, then dissolve);
+  // what is left is soft bluish sky light from all directions — no shadows.
   // Late-afternoon day: lower, warmer sun and longer shadows, a step towards dusk.
   day: { zenith: '#6b8fbd', horizon: '#e6dccb', ground: '#aea898', fog: '#d4d3cc', sunColor: '#ffe2bd', sunIntensity: 2.9, hemiIntensity: 0.4, sunElevation: 0.55, exposure: 0.92, env: 0.45, night: 0 },
   dusk: { zenith: '#34466e', horizon: '#eea36a', ground: '#5f5650', fog: '#b98d77', sunColor: '#ffa45e', sunIntensity: 2.0, hemiIntensity: 0.3, sunElevation: 0.22, exposure: 1.05, env: 0.35, night: 0.7 },
-  night: { zenith: '#070d1c', horizon: '#1d2740', ground: '#16171b', fog: '#1a2235', sunColor: '#a8bcff', sunIntensity: 0.25, hemiIntensity: 0.08, sunElevation: 0.9, exposure: 1.15, env: 0.12, night: 1 },
+  night: { zenith: '#070d1c', horizon: '#1d2740', ground: '#16171b', fog: '#1a2235', sunColor: '#a8bcff', sunIntensity: 0, hemiIntensity: 0.3, sunElevation: 0.03, exposure: 1.15, env: 0.2, night: 1 },
 };

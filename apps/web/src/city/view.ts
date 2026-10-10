@@ -189,12 +189,13 @@ export class CityView {
 
   /** Day / dusk / night: sky, light and lit windows. */
   setTime(t: TimeOfDay): void {
-    const p = this.look.setTime(t);
-    this.sun.color.set(p.sunColor);
-    this.sun.intensity = p.sunIntensity;
-    this.hemi.intensity = p.hemiIntensity * 1.2;
-    this.sunElevation = p.sunElevation;
-    this.look.setSun(new THREE.Vector3(-160, 260 * p.sunElevation, 140));
+    this.look.setTime(t, (p, done) => {
+      this.sun.color.set(p.sunColor);
+      this.sun.intensity = p.sunIntensity;
+      this.hemi.intensity = p.hemiIntensity * 1.2;
+      this.sunElevation = p.sunElevation;
+      if (done) this.look.setSun(new THREE.Vector3(-160, 260 * p.sunElevation, 140));
+    });
   }
 
   /** Close-up at the city centre: low angle, the detailed houses fill the view. */

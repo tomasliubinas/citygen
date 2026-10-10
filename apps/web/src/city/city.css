@@ -77,7 +77,7 @@ button.primary { background: var(--accent); color: #fff; border-color: var(--acc
 /* Phone: 3D view on top, settings scroll underneath it. */
 @media (max-width: 760px) {
   html, body { height: 100dvh; }
-  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 44dvh minmax(0, 1fr); }
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 53dvh minmax(0, 1fr); }
   .viewport { order: -1; border-bottom: 1px solid var(--line); }
   .panel { border-right: 0; min-width: 0; min-height: 0; }
   header { padding: 10px 16px 6px; }

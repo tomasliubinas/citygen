@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { generateCity, type CityPattern, type PlotSpec } from '@citygen/city';
 import { STYLES, type HouseSpec } from '@citygen/house';
 import { Minimap } from './minimap';
@@ -108,11 +109,38 @@ function labels(): void {
 }
 
 import { cameraFromHash, cameraToHash, onCameraSettled } from '../render/camera-hash';
+import { autoOrbit, type OrbitPlan } from '../render/orbit';
 // The default view: a chosen spot in the default city (seed amber).
 const DEFAULT_CAM = '8.1,51.0,-113.8,61.6,6.0,-36.8';
 const hashParams = new URLSearchParams(location.hash.slice(1));
 const initialCam = hashParams.get('cam') ?? (hashParams.has('seed') ? null : DEFAULT_CAM);
-onCameraSettled(view.controls, () => writeHash());
+// Opening without a saved camera: orbit around what the opening view looks at (the park
+// a few houses ahead), at the opening view's distance and height. Pauses while the user
+// moves; resumes after a while around the point at the same distance ahead of the camera.
+let cityOrbit: OrbitPlan | null = null;
+let cityBase: { ahead: number; radius: number; elevation: number; y: number } | null = null;
+const aheadOfCamera = (): OrbitPlan => {
+  if (!cityBase) {
+    const off = view.camera.position.clone().sub(view.controls.target);
+    cityBase = { ahead: Math.hypot(off.x, off.z), radius: off.length(), elevation: Math.asin(off.y / off.length()), y: view.controls.target.y };
+  }
+  const dir = new THREE.Vector3();
+  view.camera.getWorldDirection(dir);
+  dir.y = 0;
+  if (dir.lengthSq() < 1e-6) dir.set(0, 0, -1);
+  dir.normalize();
+  const pivot = view.camera.position.clone().addScaledVector(dir, cityBase.ahead);
+  pivot.y = cityBase.y;
+  return { pivot, radius: cityBase.radius, elevation: cityBase.elevation };
+};
+const orbit = hashParams.has('cam')
+  ? null
+  : autoOrbit(view.controls, view.camera, () => (first ? null : (cityOrbit ??= aheadOfCamera())), {
+      speed: -1.18, resumeSpeed: -0.91, onResume: () => (cityOrbit = aheadOfCamera()),
+    });
+onCameraSettled(view.controls, () => {
+  if (!orbit?.active) writeHash();
+});
 
 function writeHash(): void {
   const on = styleIds.filter((k) => state.styles[k] !== false);
@@ -191,12 +219,12 @@ view.onPick = (plot: PlotSpec | null, spec: HouseSpec | null) => {
   for (const f of (spec?.features ?? []).slice(1, 5)) ul.append(Object.assign(document.createElement('li'), { textContent: f }));
   const open = document.createElement('button');
   open.className = 'primary';
-  open.textContent = 'Open in house editor';
+  open.textContent = 'Open in house generator';
   open.addEventListener('click', () => {
     const e = plot.house.envelope;
     const q = new URLSearchParams({
       seed: plot.seed, x0: String(e.x), z0: String(e.z), x1: String(e.x + e.width), z1: String(e.z + e.depth),
-      front: 'south', c: plot.centrality.toFixed(2), style: plot.style, time: state.time,
+      front: 'south', c: plot.centrality.toFixed(2), style: plot.style,
     });
     // Terraced houses: keep their fire walls, or the editor shows windows where the neighbours are.
     if (plot.house.partyWalls?.left) q.set('pl', '1');

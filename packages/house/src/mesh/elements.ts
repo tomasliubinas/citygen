@@ -78,11 +78,9 @@ export function railing(mb: MeshBuilder, a: Vec3, b: Vec3, kind: 'stone' | 'iron
     // Whiplash ironwork: posts, rails, and per-panel sweeping arcs, rings and curls.
     const dir = normalize([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
     const side = normalize(cross(dir, [0, 1, 0]));
-    const upP = cross(side, dir);
     const len3 = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
     const panels = Math.max(1, Math.round(horiz / 0.95));
     const L = len3 / panels;
-    const H = height - 0.14;
     mb.paint('metal', () => {
       mb.beam(up(a, height), up(b, height), 0.06, 0.045);
       mb.beam(up(a, 0.08), up(b, 0.08), 0.035, 0.035);
@@ -92,13 +90,32 @@ export function railing(mb: MeshBuilder, a: Vec3, b: Vec3, kind: 'stone' | 'iron
       }
       for (let i = 0; i < panels; i++) {
         const o = at(i / panels);
-        mb.with(frame(dir, upP, side, o), () => {
-          const rr = Math.min(L, H) * 0.82;
-          mb.arcBand(L, 0.08, rr - 0.018, rr, Math.PI / 2, Math.PI, -0.011, 0.011, 12);
-          mb.arcBand(0, 0.08, rr * 0.6 - 0.016, rr * 0.6, 0, Math.PI / 2, -0.011, 0.011, 10);
-          mb.arcBand(L * 0.42, H * 0.66, 0.075, 0.095, 0, Math.PI * 2, -0.011, 0.011, 14);
-          mb.arcBand(L * 0.66, H * 0.36, 0.045, 0.062, 0, Math.PI * 1.5, -0.011, 0.011, 10);
-          mb.box(L * 0.5 - 0.009, H * 0.66 + 0.095, -0.011, L * 0.5 + 0.009, height, 0.011);
+        // Sheared panel frame: x along the (sloped) rail, y straight up — so on a stair the
+        // ornament stays between the vertical posts and under the rail.
+        mb.with(frame(dir, [0, 1, 0], side, o), () => {
+          // Fixed whiplash panel; every piece touches a rail, a post or another piece.
+          const y0 = 0.08;
+          const T = height;
+          const rr = Math.min(L, T - y0) * 0.86;
+          // Two concentric sweeps from the right post down to the bottom rail.
+          mb.arcBand(L, y0, rr - 0.02, rr, Math.PI / 2, Math.PI, -0.011, 0.011, 14);
+          mb.arcBand(L, y0, rr * 0.72 - 0.016, rr * 0.72, Math.PI / 2, Math.PI, -0.011, 0.011, 12);
+          // Small sweep in the lower left corner (bottom rail → left post).
+          const rs = Math.min(L, T) * 0.42;
+          mb.arcBand(0, y0, rs - 0.016, rs, 0, Math.PI / 2, -0.011, 0.011, 10);
+          // Counter-sweep hanging from the top rail at the left post.
+          const rt = Math.min(L, T) * 0.34;
+          mb.arcBand(0, T, rt - 0.016, rt, -Math.PI / 2, 0, -0.011, 0.011, 10);
+          // Ring on a drop bar from the top rail.
+          const rx = L * 0.42;
+          const ry = (T + y0) * 0.55;
+          mb.arcBand(rx, ry, 0.075, 0.095, 0, Math.PI * 2, -0.011, 0.011, 16);
+          mb.box(rx - 0.009, ry + 0.09, -0.011, rx + 0.009, T, 0.011);
+          // Curl resting inside the outer sweep.
+          const ca = (3 * Math.PI) / 4;
+          const cr = 0.06;
+          const cd = rr - 0.02 - cr;
+          mb.arcBand(L + Math.cos(ca) * cd, y0 + Math.sin(ca) * cd, cr - 0.016, cr, -Math.PI / 4, Math.PI * 1.25, -0.011, 0.011, 12);
         });
       }
     });

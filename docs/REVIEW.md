@@ -20,7 +20,7 @@ Severity: **H** high · **M** medium · **L** low. "Verified" = reproduced, not 
 | # | Sev | Finding | Status |
 |---|-----|---------|--------|
 | 8 | **H** | "Open in house editor" omits `partyWalls` (and `pl`/`pr`): terraced city houses open as free-standing ones with windows on the fire walls — not the same house. | **Fixed** (pl/pr passed) |
-| 9 | L | The link also drops time of day (city defaults to dusk, house opens at day) and wear stays auto — usually equal, but not guaranteed if wear rules differ. | Time **fixed**; wear still auto |
+| 9 | L | The link also drops time of day (city defaults to dusk, house opens at day) and wear stays auto — usually equal, but not guaranteed if wear rules differ. | Time deliberately not passed (editor opens at day); wear still auto |
 | 10 | L | `window.open(..., '_blank')` without `noopener`; same-origin so low risk, but the new tab can reach `window.opener`. | Read |
 
 ## Temporary objects / resources

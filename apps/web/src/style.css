@@ -41,7 +41,7 @@ h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: 
 
 .plan {
   width: 336px;
-  height: 336px;
+  height: 252px;
   display: block;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -106,7 +106,7 @@ button:hover { border-color: #c9c5bc; }
 /* Phone: 3D view on top, settings scroll underneath it (generator first, then the plot). */
 @media (max-width: 760px) {
   html, body { height: 100dvh; }
-  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 44dvh minmax(0, 1fr); }
+  body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 53dvh minmax(0, 1fr); }
   .viewport { order: -1; border-bottom: 1px solid var(--line); }
   .panel { border-right: 0; min-width: 0; min-height: 0; }
   header { padding: 10px 16px 6px; }
@@ -115,7 +115,7 @@ button:hover { border-color: #c9c5bc; }
   section.grow { order: 3; }
   .more { display: block; order: 4; }
   .more[hidden] { display: none; }
-  .plan { width: 100%; max-width: 336px; height: auto; aspect-ratio: 1; }
+  .plan { width: 100%; max-width: 336px; height: auto; aspect-ratio: 4 / 3; }
 }
 
 .hud { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 3; }

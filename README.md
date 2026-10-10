@@ -4,7 +4,7 @@ Procedural 3D city generator in the browser: seeded, style-aware historic houses
 
 **Live demo:** [zodele.lt/citygen](https://zodele.lt/citygen/) · [city view](https://zodele.lt/citygen/city.html)
 
-![House editor](docs/screenshots/house.jpg)
+![House generator](docs/screenshots/house.jpg)
 
 ![City](docs/screenshots/city.jpg)
 
@@ -24,7 +24,7 @@ packages/core      seeded RNG, math, mesh builder
 packages/city      street grid → plots
 packages/house     plot → HouseSpec → mesh
 packages/interior  HouseSpec → rooms, doors, stairs → mesh
-apps/web           house editor (index.html) and city (city.html)
+apps/web           house generator (index.html) and city (city.html)
 ```
 
 ## Run
