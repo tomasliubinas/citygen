@@ -231,7 +231,7 @@ function regenerate(): void {
   viewer.setHouse(spec, mesh);
   if (interiorMeshes) viewer.setInterior(interior, interiorMeshes);
   viewer.setInteriorVisible(state.contract);
-  editor.setOverlay(spec);
+  editor.setOverlay(spec, interior);
 
   const tris = Object.values(mesh).reduce((s, p) => s + p.indices.length / 3, 0);
   $('timing').textContent = `${ms.toFixed(0)} ms · ${(tris / 1000).toFixed(0)}k tris`;

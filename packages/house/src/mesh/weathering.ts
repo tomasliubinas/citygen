@@ -202,6 +202,9 @@ function buildClutter(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
   const clusters = Math.max(1, Math.round((fc.length / 7) * Math.min(1, 0.4 + cond)));
   const kinds = [['box', 4], ['crate', 3], ['bin', 2], ['barrel', 2], ['pallet', 1.5], ['sack', 2], ['bucket', 1.5], ['planks', 1.5], ['tyres', 1]] as const;
   const used: [number, number][] = [];
+  // Near derelict, some heaps grow taller (own stream: existing choices stay put).
+  const rp = Rng.create(spec.input.seed, 'clutter-pile');
+  const pile = Math.max(0, Math.min(1, (cond - 0.75) / 0.25));
   mb.with(facadeFrame(fc), () => {
     for (let c = 0; c < clusters; c++) {
       const per = Math.round(n / clusters + (r.next() - 0.5) * 2);
@@ -220,7 +223,7 @@ function buildClutter(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
       let right = uc;
       const back: [number, number][] = [];
       for (let k = 0; k < per; k++) {
-        const kind = r.chance(0.3) ? fav : r.weighted(kinds);
+        let kind: Clutter = r.chance(0.3) ? fav : r.weighted(kinds);
         const wdt = kind === 'bin' ? 0.62 : kind === 'barrel' ? 0.6 : kind === 'pallet' ? 1.2 : kind === 'planks' ? 1.6 : kind === 'tyres' ? 0.65 : kind === 'bucket' ? 0.32 : 0.4 + r.next() * 0.35;
         // Back row against the wall first; some items land in a front row, in front of the heap.
         const front = k > 1 && kind !== 'pallet' && kind !== 'bin' && kind !== 'planks' && r.chance(0.35);
@@ -238,10 +241,12 @@ function buildClutter(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
         const xw = fc.a[0] + dx * u;
         if (u < 1.5 || u > fc.length - 1.5 || (xw > clear[0] && xw < clear[1])) continue;
         if (!front) back.push([u - wdt / 2, u + wdt / 2]);
+        // Boards never lean against a window or door: lay a pallet stack there instead.
+        if (kind === 'planks' && fc.openings.some((o) => o.sill < 2.4 && Math.abs(o.u - u) < o.width / 2 + wdt / 2 + 0.2)) kind = 'pallet';
         // Leaning things stand 0.5 m out with their tops resting on the wall; the rest sit near it.
         const out = kind === 'planks' ? 0.5 : Math.min(maxOut - wdt / 2, (front ? 0.85 : 0.18) + wdt / 2);
         const turn = kind === 'planks' ? 0 : (r.next() - 0.5) * (front ? 0.8 : 0.3);
-        mb.with(mul(translation(u, 0, out), rotationY(turn)), () => clutterItem(mb, kind, wdt, r));
+        mb.with(mul(translation(u, 0, out), rotationY(turn)), () => clutterItem(mb, kind, wdt, r, !front && rp.chance(pile * 0.6)));
       }
       used.push([left - 0.6, right + 0.6]);
     }
@@ -251,11 +256,12 @@ function buildClutter(mb: MeshBuilder, spec: HouseSpec, cond: number): void {
 type Clutter = 'box' | 'crate' | 'bin' | 'barrel' | 'pallet' | 'sack' | 'bucket' | 'planks' | 'tyres';
 
 /** Simple-shaped junk: a few boxes / cylinders each, cheap and readable. */
-function clutterItem(mb: MeshBuilder, kind: Clutter, w: number, r: Rng): void {
+function clutterItem(mb: MeshBuilder, kind: Clutter, w: number, r: Rng, high = false): void {
   const h2 = w / 2;
+  const more = high ? 2 : 0;
   if (kind === 'box') {
     // One to three cardboard boxes stacked, each smaller and a little askew.
-    const stack = 1 + Math.floor(r.next() * 3);
+    const stack = 1 + Math.floor(r.next() * 3) + more;
     let y = 0;
     let s = w;
     mb.paint('cardboard', () => {
@@ -263,16 +269,20 @@ function clutterItem(mb: MeshBuilder, kind: Clutter, w: number, r: Rng): void {
         const hh = s * (0.6 + r.next() * 0.3);
         mb.with(mul(translation((r.next() - 0.5) * 0.06, y, (r.next() - 0.5) * 0.06), rotationY((r.next() - 0.5) * 0.4)), () => mb.box(-s / 2, 0, -s * 0.4, s / 2, hh, s * 0.4));
         y += hh;
-        s *= 0.8;
+        s *= high ? 0.9 : 0.8;
       }
     });
   } else if (kind === 'crate') {
     // Solid wooden crate with two darker bands.
     const h = w * 0.75;
-    mb.paint('crate', () => mb.box(-h2, 0, -h2, h2, h, h2));
-    mb.paint('cardboard', () => {
-      for (const y of [h * 0.3, h * 0.7]) mb.box(-h2 - 0.01, y - 0.03, -h2 - 0.01, h2 + 0.01, y + 0.03, h2 + 0.01);
-    });
+    for (let k = 0; k <= (high ? 2 : 0); k++) {
+      mb.with(mul(translation((r.next() - 0.5) * 0.08, k * h, 0), rotationY(k ? (r.next() - 0.5) * 0.3 : 0)), () => {
+        mb.paint('crate', () => mb.box(-h2, 0, -h2, h2, h, h2));
+        mb.paint('cardboard', () => {
+          for (const y of [h * 0.3, h * 0.7]) mb.box(-h2 - 0.01, y - 0.03, -h2 - 0.01, h2 + 0.01, y + 0.03, h2 + 0.01);
+        });
+      });
+    }
   } else if (kind === 'bin') {
     mb.paint(r.chance(0.5) ? 'binGreen' : 'binGrey', () => {
       mb.box(-0.29, 0.04, -0.3, 0.29, 1.0, 0.3);
@@ -282,7 +292,7 @@ function clutterItem(mb: MeshBuilder, kind: Clutter, w: number, r: Rng): void {
     mb.paint(r.chance(0.5) ? 'rust' : 'binGrey', () => mb.lathe([[0, 0], [0.29, 0], [0.3, 0.9], [0, 0.9]], 10));
   } else if (kind === 'pallet') {
     // Stacked pallets: each a flat deck on a slotted base.
-    const n = 2 + Math.floor(r.next() * 5);
+    const n = 2 + Math.floor(r.next() * 5) + more * 3;
     mb.paint('crate', () => {
       for (let k = 0; k < n; k++) {
         const y = k * 0.145;
@@ -313,7 +323,7 @@ function clutterItem(mb: MeshBuilder, kind: Clutter, w: number, r: Rng): void {
   } else {
     // A stack of old tyres.
     mb.paint('void', () => {
-      const n = 2 + Math.floor(r.next() * 3);
+      const n = 2 + Math.floor(r.next() * 3) + more * 2;
       for (let i = 0; i < n; i++) mb.with(translation((r.next() - 0.5) * 0.05, i * 0.2, 0), () => mb.lathe([[0.15, 0], [0.32, 0], [0.32, 0.2], [0.15, 0.2], [0.15, 0]], 12));
     });
   }

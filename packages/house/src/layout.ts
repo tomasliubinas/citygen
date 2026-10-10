@@ -634,20 +634,24 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     const lo = Math.min(horizontal ? fc.a[0] : fc.a[1], horizontal ? fc.b[0] : fc.b[1]);
     const hi = Math.max(horizontal ? fc.a[0] : fc.a[1], horizontal ? fc.b[0] : fc.b[1]);
     const line = horizontal ? fc.a[1] : fc.a[0];
-    const candidates: { p: number; wing?: string; stair: boolean }[] = [];
-    const push = (p: number, wing?: string, stair = false) => {
+    const candidates: { p: number; wing?: string; stair: boolean; entry?: boolean }[] = [];
+    const push = (p: number, wing?: string, stair = false, entry = false) => {
       if (p - winW / 2 < lo + 0.6 || p + winW / 2 > hi - 0.6) return;
       const [px, pz] = horizontal ? [p, line - fc.normal[1] * 0.6] : [line - fc.normal[0] * 0.6, p];
       const m = inside(px, pz);
       if (!m) return;
       if ((wing ?? 'main') !== (m.role.startsWith('court') ? m.id : 'main')) return;
       if (candidates.some((c2) => Math.abs(c2.p - p) < winW + 0.3)) return;
-      candidates.push({ p, wing, stair });
+      candidates.push({ p, wing, stair, entry });
     };
     for (const [id, gr] of wingGrid) {
       const courtSide = (gr.axis === 'z' && !horizontal && inside(line - fc.normal[0] * 0.6, gr.along[0])?.id === id && Math.abs(fc.normal[0]) > 0.5 && (id === 'court-l' ? fc.normal[0] > 0 : fc.normal[0] < 0))
         || (gr.axis === 'x' && horizontal && fc.normal[1] > 0.5);
-      if ((gr.axis === 'z') !== horizontal) for (const p of gr.along) push(p, id, courtSide && Math.abs(p - gr.stairAt) < 1e-6);
+      // A closed courtyard is reached only through the house: the wing's front door is on
+      // its outer wall (into the entrance hall); the courtyard door stays as the yard exit.
+      const outerSide = plan === 'o' && ((gr.axis === 'z' && !horizontal && inside(line - fc.normal[0] * 0.6, gr.along[0])?.id === id && (id === 'court-l' ? fc.normal[0] < -0.5 : fc.normal[0] > 0.5))
+        || (gr.axis === 'x' && horizontal && fc.normal[1] < -0.5));
+      if ((gr.axis === 'z') !== horizontal) for (const p of gr.along) push(p, id, courtSide && Math.abs(p - gr.stairAt) < 1e-6, outerSide && Math.abs(p - gr.stairAt) < 1e-6);
       else for (const p of gr.across) push(p, id);
     }
     for (const p of horizontal ? centers : mainZGrid) push(p);
@@ -664,6 +668,19 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
         }
         const run = steps * TREAD;
         wingStairs.push({ id: `s-${cnd.wing}`, role: 'entrance', x0: u - 1.2, x1: u + 1.2, zStart: 0, zEnd: run + 0.9, landing: 0.9, fromY: 0, toY: plinth, steps, direction: 'front', railing: g.balustrade === 'stone' ? 'iron' : g.balustrade, pedestals: false, facadeId: fc.id });
+        continue;
+      }
+      if (cnd.entry) {
+        // Outer walls stand close to the plot edge: with no room for steps outside, the door
+        // opens at street level and the steps up to the ground floor are inside the hall.
+        const run = steps * TREAD;
+        const room = fc.normal[0] > 0.5 ? W / 2 - fc.a[0] : fc.normal[0] < -0.5 ? fc.a[0] + W / 2 : fc.normal[1] < -0.5 ? fc.a[1] + D / 2 : D / 2 - fc.a[1];
+        const outside = room >= run + 0.95;
+        const sill = outside ? floors[0].elevation : 0;
+        const height = Math.min(floors[0].height - 1.0, 2.9) + floors[0].elevation - sill;
+        addOpening(fc, { kind: 'door', floor: 0, u, sill, width: 1.3, height, head: g.archedGround ? 'arched' : 'flat', crown: 'none', apron: false, sillConsoles: false, surround: 'portico' });
+        for (const f of floors.slice(1)) addOpening(fc, { kind: 'window', floor: f.index, u, width: winW, ...windowFor(f, 1, false) });
+        if (outside) wingStairs.push({ id: `s-${cnd.wing}-out`, role: 'entrance', x0: u - 1.2, x1: u + 1.2, zStart: 0, zEnd: run + 0.9, landing: 0.9, fromY: 0, toY: plinth, steps, direction: 'front', railing: g.balustrade === 'stone' ? 'iron' : g.balustrade, pedestals: false, facadeId: fc.id });
         continue;
       }
       for (const f of floors) addOpening(fc, { kind: 'window', floor: f.index, u, width: winW, ...windowFor(f, 1, false) });
