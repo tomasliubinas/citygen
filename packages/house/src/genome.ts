@@ -97,6 +97,14 @@ export interface ManorGenome {
   tallGround: number;
   /** Glazed-tile frieze under the eaves. */
   accentFrieze: boolean;
+  /** Classical pediment variant (triangle gables only). */
+  pedimentForm: 'plain' | 'broken' | 'acroteria';
+  /** Kaunas: amber/blue coloured-glass margins on the staircase windows. */
+  artGlass: boolean;
+  /** Kaunas: raised rhombus (folk-motif) panels over the upper windows. */
+  diamondPanels: boolean;
+  /** Kaunas: three close-set vertical grooves down the middle of each pilaster shaft. */
+  pilasterGrooves: boolean;
   /** Ground floor repainted in its own shade (shops, a newer owner): wall colour multiplier, or null. */
   groundPaint: [number, number, number] | null;
   endWings: boolean;
@@ -138,6 +146,7 @@ export interface StylePreset {
   corners: Weighted<'quoins' | 'pilasters' | 'lesenes' | 'none'>;
   balustrade: Weighted<RailingKind>;
   gableShape: Weighted<GableShape>;
+  pedimentForm?: Weighted<'plain' | 'broken' | 'acroteria'>;
   towerRoof: Weighted<'cone' | 'bell'>;
   towerPlan: Weighted<'corner' | 'castle' | 'gate'>;
   towerShape: Weighted<'octagon' | 'round'>;
@@ -181,6 +190,11 @@ export interface StylePreset {
     tallGround?: number;
     groundPaint?: number;
     accentDoor?: number;
+    artGlass?: number;
+    diamondPanels?: number;
+    pilasterGrooves?: number;
+    /** Oxblood window frames instead of the usual palette. */
+    redFrames?: number;
   };
   colors: { wall: Weighted<string>; roof: Weighted<string>; frame: Weighted<string>; door: Weighted<string>; accent: Weighted<string>; trim?: Weighted<string>; stone?: Weighted<string> };
 }
@@ -204,6 +218,7 @@ const NO_ACCENT: Weighted<string> = [['#2f5d57', 1]];
 /** White early-20th-century classicist manor with an anthracite roof. */
 export const CLASSICIST_MANOR: StylePreset = {
   id: 'classicist-manor',
+  pedimentForm: [['plain', 0.7], ['acroteria', 0.2], ['broken', 0.1]],
   ...CLASSICAL_EXTRAS,
   label: 'Classicist manor (early XX c.)',
   bayWidth: [3.1, 3.7],
@@ -258,6 +273,7 @@ export const CLASSICIST_MANOR: StylePreset = {
  */
 export const BEAUX_ARTS: StylePreset = {
   id: 'beaux-arts',
+  pedimentForm: [['plain', 0.6], ['broken', 0.2], ['acroteria', 0.2]],
   ...CLASSICAL_EXTRAS,
   label: 'Beaux-Arts mansion (1890–1914)',
   bayWidth: [3.3, 3.9],
@@ -470,6 +486,10 @@ export const KAUNAS_DECO: StylePreset = {
     tallGround: 0.65,
     groundPaint: 0.25,
     accentDoor: 0.25,
+    artGlass: 0.6,
+    diamondPanels: 0.9,
+    pilasterGrooves: 0.9,
+    redFrames: 0.35,
     rusticatedGround: 0.35, archedGround: 0, endWings: 0.4, wingBalconies: 0.6, porticoBalcony: 0, fanlight: 0, oculus: 0,
     dentils: 0, pairedColumns: 0, parapet: 0, balconets: 0.5, cresting: 0, tower: 0, smallPanes: 0, accentFrieze: 0.25,
     stringCourses: 1, entranceStrip: 0.65, flagpole: 0, decoBands: 0.45, portholes: 0.4, fluting: 0.35, groundCladding: 0.5,
@@ -510,6 +530,7 @@ export const VILNIUS_OLD_TOWN: StylePreset = {
   corners: [['pilasters', 0.4], ['none', 0.6]],
   balustrade: [['iron', 1]],
   dormers: [['alternate', 0.4], ['all', 0.3], ['none', 0.3]],
+  pedimentForm: [['plain', 0.65], ['broken', 0.35]],
   gableShape: [['volute', 0.75], ['triangle', 0.25]],
   towerRoof: [['cone', 1]],
   towerPlan: [['corner', 1]],
@@ -546,6 +567,7 @@ export const VILNIUS_OLD_TOWN: StylePreset = {
  */
 export const FRENCH_CLASSICAL: StylePreset = {
   id: 'french-classical',
+  pedimentForm: [['plain', 0.7], ['acroteria', 0.3]],
   label: 'French Classical villa',
   ...CLASSICAL_EXTRAS,
   bayWidth: [3.6, 4.4],
@@ -627,7 +649,7 @@ export function createGenome(seed: string, styleId: StyleId = 'classicist-manor'
     balconets: r('balconets').chance(p.chance.balconets),
     cresting: r('cresting').chance(p.chance.cresting),
     dormerShape: r('dormer-shape').weighted(p.dormerShape),
-    gableShape: r('gable-shape').weighted(p.gableShape),
+  gableShape: r('gable-shape').weighted(p.gableShape),
     tower: r('tower').chance(p.chance.tower),
     towerSide: r('tower-side').chance(0.5) ? 'left' : 'right',
     towerRoof: r('tower-roof').weighted(p.towerRoof),
@@ -675,11 +697,15 @@ export function createGenome(seed: string, styleId: StyleId = 'classicist-manor'
     dormers: r('dormers').weighted(p.dormers),
     dentils: r('dentils').chance(p.chance.dentils),
     stairSide: r('stair-side').chance(0.5) ? 'left' : 'right',
+    pedimentForm: p.pedimentForm ? r('pediment-form').weighted(p.pedimentForm) : 'plain',
+    artGlass: r('art-glass').chance(p.chance.artGlass ?? 0),
+    diamondPanels: r('diamond-panels').chance(p.chance.diamondPanels ?? 0),
+    pilasterGrooves: r('pilaster-grooves').chance(p.chance.pilasterGrooves ?? 0),
     groundPaint: r('ground-paint').chance(p.chance.groundPaint ?? 0.15) ? GROUND_PAINTS[r('ground-paint-k').int(0, GROUND_PAINTS.length - 1)] : null,
     colors: {
       wall: r('c-wall').weighted(p.colors.wall),
       roof: r('c-roof').weighted(p.colors.roof),
-      frame: r('c-frame').weighted(p.colors.frame),
+      frame: r('red-frames').chance(p.chance.redFrames ?? 0) ? '#7a2b26' : r('c-frame').weighted(p.colors.frame),
       // Sometimes a painted accent door instead of the style's usual dark wood.
       door: r('accent-door').chance(p.chance.accentDoor ?? 0.25) ? r('accent-door-c').weighted(ACCENT_DOORS) : r('c-door').weighted(p.colors.door),
       accent: r('c-accent').weighted(p.colors.accent),

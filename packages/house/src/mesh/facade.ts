@@ -79,6 +79,8 @@ export function headOf(o: OpeningSpec): Head | null {
 
 /** Seed of the house being built: gives every pane its own random value (glass `alpha` = window id). */
 let glassSeed = '';
+/** Kaunas coloured-glass margins on staircase windows (set per house). */
+let artGlass = false;
 let glassWear = 0;
 /** Pane value = random fraction (curtains etc.) + integer wear bucket 0…10 of the house. */
 const paneValue = (id: string) => hash32(`${glassSeed}/${id}`) / 4294967296 + Math.round(glassWear * 10);
@@ -87,6 +89,7 @@ export type DoorSurround = HouseSpec['composition']['doorSurround'];
 
 export function buildFacades(mb: MeshBuilder, spec: HouseSpec): void {
   glassSeed = spec.input.seed;
+  artGlass = spec.genome.artGlass;
   glassWear = spec.weathering.condition;
   const t = spec.wallThickness;
   const eave = spec.roof.eaveY;
@@ -137,7 +140,7 @@ export function buildFacades(mb: MeshBuilder, spec: HouseSpec): void {
         if (p.facadeId !== fc.id) continue;
         if (p.style === 'lesene') lesene(mb, p.u, p.width, p.y0, p.y1);
         else if (p.style === 'strip') mb.paint('trim', () => mb.box(p.u - p.width / 2, p.y0, 0, p.u + p.width / 2, p.y1, 0.12));
-        else pilaster(mb, p.u, p.width, p.y0, p.y1, 0);
+        else pilaster(mb, p.u, p.width, p.y0, p.y1, 0, spec.genome.pilasterGrooves);
       }
 
       for (const o of fc.openings) {
@@ -154,6 +157,32 @@ export function buildFacades(mb: MeshBuilder, spec: HouseSpec): void {
         mb.paint('accent', () => {
           for (const f of spec.floors.slice(1)) {
             for (const r of cutRects(cx.start ? -0.02 : 0, fc.length + (cx.end ? 0.02 : 0), f.elevation + 0.12, f.elevation + 0.42, [...holes, ...piers])) mb.box(r.u0, r.v0, 0, r.u1, r.v1, 0.02);
+          }
+        });
+      }
+      if (spec.genome.diamondPanels) {
+        // Kaunas folk motif: a row of three raised rhombi under each upper-floor window.
+        mb.paint('trim', () => {
+          for (const o of fc.openings) {
+            if (o.floor < 1 || o.kind !== 'window' || o.balconyId) continue;
+            // Not behind a balcony or balconet railing.
+            const [px, , pz] = o.position;
+            if (spec.balconies.some((b) => b.floor === o.floor && px > b.x0 - 0.1 && px < b.x1 + 0.1 && Math.abs(pz - b.zFace) < 0.6)) continue;
+            // In the spandrel under the sill when there is room (clear of the dark band);
+            // otherwise on the dark under-window band, light on dark, like a folk-pattern frieze.
+            // (Only where the band actually runs under the window: tall central lights cut through it.)
+            const below = o.sill - 0.14 - (spec.floors[o.floor].elevation + (spec.genome.decoBands ? 0.47 : 0.12));
+            const onBand = below < 0.22 && spec.genome.decoBands && o.sill >= spec.floors[o.floor].elevation + 0.45;
+            if (below < 0.22 && !onBand) continue;
+            const hd = onBand ? 0.24 : Math.min(0.32, below);
+            const yc = onBand ? spec.floors[o.floor].elevation + 0.27 : o.sill - 0.14 - hd / 2;
+            const z0 = onBand ? 0.02 : 0;
+            const dw = Math.min(o.width / 3, hd * 1.4);
+            for (const k of [-1, 0, 1]) {
+              const x = o.u + k * dw;
+              mb.extrude([[x - dw / 2, yc], [x, yc - hd / 2], [x + dw / 2, yc], [x, yc + hd / 2]], z0, z0 + 0.025);
+              mb.extrude([[x - dw / 4, yc], [x, yc - hd / 4], [x + dw / 4, yc], [x, yc + hd / 4]], z0 + 0.025, z0 + 0.04);
+            }
           }
         });
       }
@@ -221,8 +250,14 @@ function quoins(mb: MeshBuilder, fc: FacadeSpec, cx: { start: boolean; end: bool
   });
 }
 
-export function pilaster(mb: MeshBuilder, u: number, w: number, y0: number, y1: number, out0: number): void {
+export function pilaster(mb: MeshBuilder, u: number, w: number, y0: number, y1: number, out0: number, grooves = false): void {
   const h = w / 2;
+  if (grooves) {
+    // Three close-set grooves down the whole shaft, base to capital (read as dark lines).
+    mb.paint('roofTrim', () => {
+      for (const k of [-1, 0, 1]) mb.box(u + k * 0.06 - 0.009, y0 + 0.36, out0 + 0.12, u + k * 0.06 + 0.009, y1 - 0.38, out0 + 0.124);
+    });
+  }
   mb.paint('trim', () => {
     mb.box(u - h - 0.05, y0, out0, u + h + 0.05, y0 + 0.28, out0 + 0.14);
     mb.box(u - h - 0.02, y0 + 0.28, out0, u + h + 0.02, y0 + 0.36, out0 + 0.11);
@@ -252,6 +287,23 @@ function glazing(mb: MeshBuilder, o: OpeningSpec, zg: number, rowsHint: number |
     if (h) mb.extrude(circle(h.cx, h.cy, h.R, 14, h.a0, h.a1), zg - 0.02, zg);
   });
   mb.value = null;
+  if (deco && artGlass && o.kind === 'stair-window' && !h) {
+    // Kaunas interwar stair light: amber glass margins down both sides, a row of blue
+    // and amber blocks along the bottom, clear glass in the middle.
+    const sw = Math.min(0.14, w * 0.14);
+    const bh = Math.min(0.3, o.height * 0.18);
+    const za = zg + 0.002;
+    const zb = zg + 0.012;
+    mb.paint('glassAmber', () => {
+      mb.box(u0 + f, o.sill + f + bh, za, u0 + f + sw, top - f, zb);
+      mb.box(u1 - f - sw, o.sill + f + bh, za, u1 - f, top - f, zb);
+    });
+    const n = 4;
+    const bw = (w - 2 * f) / n;
+    for (let i = 0; i < n; i++) {
+      mb.paint(i % 2 === 0 ? 'glassBlue' : 'glassAmber', () => mb.box(u0 + f + i * bw + 0.01, o.sill + f, za, u0 + f + (i + 1) * bw - 0.01, o.sill + f + bh, zb));
+    }
+  }
   mb.paint('frame', () => {
     mb.box(u0, o.sill, z0, u0 + f, spring, z1);
     mb.box(u1 - f, o.sill, z0, u1, spring, z1);

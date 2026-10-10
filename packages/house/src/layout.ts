@@ -286,7 +286,7 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
   const makePediment = (id: string, x0: number, x1: number, z: number, overhang: number, oculus: boolean, shape = g.gableShape): PedimentSpec => {
     const half = (x1 - x0) / 2;
     if (shape === 'triangle' || shape === 'none') {
-      return { id, x0, x1, z, baseY: eaveY, pitch: g.pedimentPitch, overhang, oculus, shape: 'triangle', height: r3((half + overhang) * Math.tan(deg(g.pedimentPitch))), wallRise: 0 };
+      return { id, x0, x1, z, baseY: eaveY, pitch: g.pedimentPitch, overhang, oculus, shape: 'triangle', height: r3((half + overhang) * Math.tan(deg(g.pedimentPitch))), wallRise: 0, form: g.pedimentForm };
     }
     // Gable wall rising above the eaves (curved, crow-stepped or a tiered Deco attic);
     // the roof behind stays below its outline.
@@ -355,7 +355,8 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
     });
   } else {
     if (!centralPavilion && comp !== 'gate-tower' && g.gableShape !== 'none') pediments.push(makePediment('p-risalit', cx0, cx1, zRis, co, g.oculus && comp === 'risalit'));
-    if (nFloors >= 2 && g.oriel !== 'center' && g.doorStyle === 'classical' && comp !== 'gate-tower') {
+    // Classical doors, and the interwar Kaunas entrance bay (a balcony over the door is typical there).
+    if (nFloors >= 2 && g.oriel !== 'center' && (g.doorStyle === 'classical' || g.style === 'kaunas-deco') && comp !== 'gate-tower') {
       balconies.push({
         // Either over the door bay only, or across the whole front of the risalit.
         id: 'b-center', floor: 1, side: 'front',
@@ -1084,6 +1085,8 @@ export function layoutHouse(rawInput: HouseInput): HouseSpec {
       stone: shade(g.colors.stone, g.tint.light * 0.05, g.tint.warm * 0.5),
       roof: shade(g.colors.roof, g.tint.roof * 0.12, 0),
       glass: '#43576a',
+      glassAmber: '#a8823c',
+      glassBlue: '#3f6d96',
       frame: g.colors.frame,
       door: g.colors.door,
       metal: '#1f2124',

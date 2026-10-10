@@ -107,6 +107,8 @@ export interface PedimentSpec {
   /** Curved gables: total rise above baseY and the straight vertical part at the sides. */
   height: number;
   wallRise: number;
+  /** Classical (triangle) variants: broken apex with a finial, corner acroteria. */
+  form?: 'plain' | 'broken' | 'acroteria';
 }
 
 export interface PorticoSpec {

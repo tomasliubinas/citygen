@@ -251,16 +251,40 @@ export function pediment(mb: MeshBuilder, p: PedimentSpec): void {
   const hr = Math.min(0.42, 0.26 + half * 0.02);
   const zb = p.z - 0.9;
   const zf = p.z + p.overhang;
+  // Broken pediment: the raking cornices stop short of the apex; a pedestal with a finial fills the gap.
+  const gap = p.form === 'broken' ? Math.min(0.55, half * 0.16) : 0;
+  if (p.form === 'acroteria' || p.form === 'broken') {
+    mb.paint('trim', () => {
+      // Acroteria: low pedestals with urns at the cornice ends (and the apex for 'acroteria').
+      if (p.form === 'acroteria') {
+        for (const s of [-1, 1]) {
+          const x = xc + s * (half - 0.22);
+          mb.box(x - 0.24, p.baseY, zf - 0.5, x + 0.24, p.baseY + 0.32, zf);
+          urn(mb, x, p.baseY + 0.32, zf - 0.25, 0.75);
+        }
+        mb.box(xc - 0.22, apex, zf - 0.5, xc + 0.22, apex + 0.26, zf);
+        urn(mb, xc, apex + 0.26, zf - 0.25, 0.7);
+      } else {
+        const y = apex - gap * tan - hr;
+        mb.box(xc - gap * 0.75, y, zf - 0.55, xc + gap * 0.75, apex + 0.18, zf - 0.02);
+        mb.box(xc - gap * 0.9, apex + 0.18, zf - 0.6, xc + gap * 0.9, apex + 0.28, zf + 0.02);
+        urn(mb, xc, apex + 0.28, zf - 0.28, 0.85);
+      }
+    });
+  }
   mb.paint('trim', () => {
     // Raking cornices with a small cyma lip on top.
     for (const s of [-1, 1]) {
       const outer: Vec2 = [xc + s * half, p.baseY];
       const inner: Vec2 = [xc + s * (half - hr / tan), p.baseY];
-      const poly: Vec2[] = s < 0 ? [outer, [xc, apex], [xc, apex - hr], inner] : [inner, [xc, apex - hr], [xc, apex], outer];
+      // Top end of the cornice: the apex, or short of it for a broken pediment.
+      const xt = xc + s * gap;
+      const yt = apex - gap * tan;
+      const poly: Vec2[] = s < 0 ? [outer, [xt, yt], [xt, yt - hr], inner] : [inner, [xt, yt - hr], [xt, yt], outer];
       mb.extrude(poly, zb, zf);
       const lip: Vec2[] = s < 0
-        ? [[outer[0] - 0.04, p.baseY], [xc, apex + 0.06], [xc, apex], [outer[0], p.baseY]]
-        : [[outer[0], p.baseY], [xc, apex], [xc, apex + 0.06], [outer[0] + 0.04, p.baseY]];
+        ? [[outer[0] - 0.04, p.baseY], [xt, yt + 0.06], [xt, yt], [outer[0], p.baseY]]
+        : [[outer[0], p.baseY], [xt, yt], [xt, yt + 0.06], [outer[0] + 0.04, p.baseY]];
       mb.extrude(lip, zf - 0.12, zf + 0.04);
     }
   });
