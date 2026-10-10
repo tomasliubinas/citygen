@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { addNavHint } from './render/nav';
 import { bushGeometry, treeVariants } from './render/trees';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
-import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, lookPad, setAge, setGroundPaint, setLedges, stainMaterial, type Look, type TimeOfDay } from './render/look';
+import { createLook, glassReflections, enhanceMaterial, geometryFor, glassMaterial, kindForSlot, setAge, setGroundPaint, setLedges, stainMaterial, type Look, type TimeOfDay } from './render/look';
 import type { InteriorSpec } from '@citygen/interior';
 import type { MeshData } from '@citygen/core';
 import type { HouseSpec, WorldEdge } from '@citygen/house';
@@ -217,47 +217,11 @@ export class HouseViewer {
     const d = rect.z1 - rect.z0;
     const lot = new THREE.Mesh(
       new THREE.PlaneGeometry(w + 6, d + 6).rotateX(-Math.PI / 2),
-      enhanceMaterial(new THREE.MeshStandardMaterial({ color: PAD_COLOR, roughness: 1 }), 'pad'),
+      enhanceMaterial(new THREE.MeshStandardMaterial({ color: PAD_COLOR, roughness: 1 }), 'ground'),
     );
     lot.position.set((rect.x0 + rect.x1) / 2, 0, (rect.z0 + rect.z1) / 2);
-    lookPad.value.set(rect.x0 - 3, rect.z0 - 3, rect.x1 + 3, rect.z1 + 3);
     lot.receiveShadow = true;
     this.site.add(lot);
-    // Soft verge: the grass darkens towards the paved plot (trampled, shaded, damp), so the
-    // pale pad doesn't sit on the lawn like a cut-out.
-    {
-      const ex0 = rect.x0 - 3;
-      const ex1 = rect.x1 + 3;
-      const ez0 = rect.z0 - 3;
-      const ez1 = rect.z1 + 3;
-      const W = 2.6;
-      const pos: number[] = [];
-      const col: number[] = [];
-      const idx: number[] = [];
-      const ring = (pts: [number, number][], out: number) => {
-        for (let i = 0; i < 4; i++) {
-          const [ax, az] = pts[i];
-          const [bx, bz] = pts[(i + 1) % 4];
-          const o = (k: [number, number]) => [k[0] + Math.sign(k[0] - (ex0 + ex1) / 2) * out, k[1] + Math.sign(k[1] - (ez0 + ez1) / 2) * out] as const;
-          const [cx2, cz2] = o([bx, bz]);
-          const [dx2, dz2] = o([ax, az]);
-          const b = pos.length / 3;
-          pos.push(ax, 0, az, bx, 0, bz, cx2, 0, cz2, dx2, 0, dz2);
-          col.push(0, 0, 0, 0.32, 0, 0, 0, 0.32, 0, 0, 0, 0, 0, 0, 0, 0);
-          idx.push(b, b + 2, b + 1, b, b + 3, b + 2);
-        }
-      };
-      ring([[ex0, ez0], [ex1, ez0], [ex1, ez1], [ex0, ez1]], W);
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
-      g.setIndex(idx);
-      const verge = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-      verge.position.y = 0.005;
-      verge.renderOrder = 1;
-      verge.userData.overlay = true;
-      this.site.add(verge);
-    }
 
     const streetW = 9;
     const horizontal = front === 'south' || front === 'north';
@@ -372,8 +336,7 @@ export class HouseViewer {
     gm.depthWrite = !see;
     for (const o of this.site.children) {
       const mm = (o as THREE.Mesh).material as THREE.Material;
-      // Overlays (the soft verge) are always blended; only their strength follows.
-      mm.transparent = see || !!o.userData.overlay;
+      mm.transparent = see;
       mm.opacity = see ? 0.2 : 1;
       mm.depthWrite = !mm.transparent;
       mm.needsUpdate = true;

@@ -13,8 +13,8 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
  * engine materials (no textures, no UVs — everything from world position).
  */
 
-export type SurfaceKind = 'none' | 'plaster' | 'trim' | 'stone' | 'roof' | 'ground' | 'pad';
-const KIND: Record<SurfaceKind, number> = { none: 0, plaster: 1, trim: 2, stone: 3, roof: 4, ground: 5, pad: 6 };
+export type SurfaceKind = 'none' | 'plaster' | 'trim' | 'stone' | 'roof' | 'ground';
+const KIND: Record<SurfaceKind, number> = { none: 0, plaster: 1, trim: 2, stone: 3, roof: 4, ground: 5 };
 
 const NOISE = /* glsl */ `
 varying vec3 vLookPos;
@@ -25,8 +25,6 @@ uniform float uLookAge;
 uniform float uLookSoft;
 uniform float uLookLedge[8];
 uniform vec4 uLookGround;
-uniform vec4 uLookPad;
-uniform vec3 uLookGrass;
 float vLookRoofSpot = 0.0;
 float lookHash3(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float lookHash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -184,18 +182,6 @@ const SURFACE = /* glsl */ `
     c *= mix(1.0, 1.1, step(0.96, r2) * rwear * fade);
     vLookRoofSpot = rspot;
 #endif
-  } else if (uLookKind == 6) {
-    // Paved plot: plain, but its edge frays into the lawn — grass tongues and moss creep
-    // over it unevenly, a few tufts just inside, so no ruler-straight line.
-    float d = min(min(wp.x - uLookPad.x, uLookPad.z - wp.x), min(wp.z - uLookPad.y, uLookPad.w - wp.z));
-    float n = lookFbm(vec3(wp.x * 0.9, 1.7, wp.z * 0.9));
-    float edge = 1.0 - smoothstep(-0.05, 0.3, d - 0.15 - 1.1 * n * n);
-    float tufts = smoothstep(0.6, 0.78, lookNoise(wp * 3.1)) * (1.0 - smoothstep(0.3, 1.5, d));
-    vec3 grass = uLookGrass * (0.85 + 0.3 * lookNoise(wp * 1.9));
-    vec3 moss = uLookGrass * vec3(0.7, 0.85, 0.6);
-    c = mix(c, mix(grass, moss, smoothstep(0.4, 0.7, n)), max(edge, tufts * 0.8));
-    // Dirt where the lawn meets the paving.
-    c *= 1.0 - 0.18 * (1.0 - smoothstep(0.0, 0.6, abs(d - 0.15 - 1.1 * n * n)));
   } else if (uLookKind == 5) {
 #ifndef LOOK_LITE
     c *= 0.82 + 0.3 * lookFbm(wp * 0.045) + 0.06 * (lookNoise(wp * 1.7) - 0.5);
@@ -247,10 +233,6 @@ export function setGroundPaint(mult: [number, number, number] | null, top: numbe
   else lookGround.value.set(1, 1, 1, -1);
 }
 
-/** Paved plot (x0, z0, x1, z1, world) and the lawn colour that creeps over its edges. */
-export const lookPad = { value: new THREE.Vector4(0, 0, 0, 0) };
-export const lookGrass = { value: new THREE.Color('#778559') };
-
 /** Add the procedural surface layer to a standard material (idempotent). */
 /** `lite`: only the cheap line patterns (brick, tiles, joints) — no per-pixel noise layers. */
 export function enhanceMaterial(mat: THREE.MeshStandardMaterial, kind: SurfaceKind, lite = false): THREE.MeshStandardMaterial {
@@ -265,8 +247,6 @@ export function enhanceMaterial(mat: THREE.MeshStandardMaterial, kind: SurfaceKi
     shader.uniforms.uLookSoft = mat.userData.soft;
     shader.uniforms.uLookLedge = lookLedges;
     shader.uniforms.uLookGround = lookGround;
-    shader.uniforms.uLookPad = lookPad;
-    shader.uniforms.uLookGrass = lookGrass;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;\nvarying vec2 vLookUv;\nattribute vec2 aFacade;')
       .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvLookNormal = normalize(mat3(modelMatrix) * objectNormal);')
